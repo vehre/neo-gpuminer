@@ -1,0 +1,160 @@
+NeoScrypt - the latest proof of work algorithm
+Neoscrypt——最新工作量证明算法
+
+As of the 26th of July 2014, NeoScrypt will be the latest proof of work (PoW) algorithm to hit the cryptocurrency world. It has been designed as an "ASIC-resistant" algorithm for GPU and CPU miners. The first alt-coin to adopt NeoScrypt will be Phoenixcoin, soon followed by Feathercoin.
+
+截至2014年7月26日，Neoscrypt这个最新工作量证明算法来到加密货币世界。它被设计为一个“防ASIC矿机”的GPU挖矿算法。第一次采用该算法的山寨币将是Phoenixcoin（凤凰币），接下来将是Feathercoin（羽毛币）。
+
+Why NeoScrypt?
+为什么是neoscrypt？
+
+As Application Specific Integrated Chip (ASIC) devices transformed the world of SHA256 (e.g. Bitcoin) mining, ASIC devices for Scrypt currencies threaten to do the same thing. The technological arms race that this technology creates means that those who have invested heavily in GPU mining would potentially lose their investments overnight.
+
+由于专用集成芯片（ASIC）已统治SHA256算法币的挖掘（例如Bitcoin），Scrypt算法货币正面临同样的威胁。这项技术上的投资军备竞赛意味着，GPU矿工的大量投资将在一夜之间消失。
+
+NeoScrypt, a strong memory intensive key derivation function, was developed by John Doering (aka "Ghostlander"), a developer for Feathercoin and Phoenixcoin, to tackle that problem.
+
+我们羽毛币团队的一个开发人员（也是Phoenixcoin的开发员）解决了这个问题。他的名字是约翰·多林（又名“Ghostlander”）。因为Neoscrypt算法具备强大的内存密集型函数。NeoScrypt白皮书即将发布。
+
+"Mining is not the perfect way to manage coin distribution and transaction processing, but there is no better alternative. Since mining cannot be avoided, it's better to keep it as decentralised as possible. This protects the network from interruptions and abuses.
+
+If ASICs were inexpensive and affordable for most people, then currency networks would not become as centralised as, for example, Bitcoin has.
+
+On the other hand, computer processors (CPUs) and video cards (GPUs) are produced in large quantities by several vendors and many people can afford them. Whereas ASICs are more expensive, depreciate very quickly and have little to no value outside of mining."
+
+John Doering, developer for Phoenixcoin and Feathercoin 
+
+Feathercoin's founder, Peter Bushnell (aka Bushstar), also said:
+
+
+"Avoiding ASICs forever may not be possible, but the current version of Scrypt makes this easier than it should be, as it uses relatively weak components that have been broken by differential analysis, this means you can get the same result without going through the process expected by Scrypt design. This is why you now see cheap ASICs for Scrypt coins coming out. We are moving to a hashing solution that uses stronger components that have not been broken yet and should not be for the next decade at least. The performance and cost of NeoScrypt ASICs would be prohibitive and this is the best way to protect the decentralised mining of Feathercoin."
+
+Advantages and Specifications
+
+Note that a white paper on NeoScrypt will be released soon.
+
+NeoScrypt will replace the Scrypt PoW algorithm, initially in Phoenixcoin (block #400K, expected to be the 10thth of August) followed by Feathercoin. Scrypt was made popular by Litecoin. The hashing technologies used by this algorithm starts with PBKDF2-HMAC-SHA256 key derivation, and ends with 8 rounds of the Salsa20 cipher as its mixing engine. However, it has been shown that only having 8 rounds of Salsa20 can be broken through differential cryptoanalysis (source).
+
+Doering created NeoScrypt to be compatible with Scrypt, but has functional differences which provide advantages over Scrypt. He has written a custom key derivation algorithm which is stronger and faster.
+
+Furthermore, NeoScrypt's mixing engine employs 20 rounds of Salsa20, followed by 20 rounds of ChaCha20 (read more about Salsa and ChaCha here). Not only is this combination faster and more secure than standard Scrypt, but it only takes 32Kb to 64Kb of memory, compared to the 128Kb of memory used by Scrypt.
+
+NeoScrypt based currency is set to become the best option for those who have a low to medium budget for mining equipment and therefore cannot afford ASIC rigs.
+
+Mining
+
+Feathercoin has always been a community focused altcoin. With that in mind, its adoption of NeoScrypt will ensure that its loyal miners will still be able to viably mine by not competing against miners who have bought Scrypt ASICs.
+
+Peter Bushnell said:
+
+
+"It is clear that Scrypt ASICs are going to be expensive so the smaller hobbyist miner is going to have no place left on Scrypt based coins just like GPUs have no place on Bitcoin any more. Only those with deep pockets can mine Bitcoin and this will end up being just a few large companies. This does not make a good case for decentralisation."
+
+When the Neoscrypt source is released, a functional CPUMiner will already be available. However, as the code is open, those with the skills necessary to create the first open source GPU miner for NeoScrypt are highly encouraged to do so. Bounties have been issued for this work.
+
+Having Pheonixcoin available to test NeoScrypt on should greatly help development of third party software like pool software and miners. Once the necessary tools are available Feathercoin will release NeoScrypt onto its network.
+
+Release notes
+
+发行说明 
+Phoenixcoin将在2014年8月10日，第400K块时使用新的算法。Feathercoin项目经理已经表示，在实施硬分叉前将留出充足的时间进行测试，并完成GPU挖矿软件，相信这是一个重大转变。
+
+Phoenixcoin will use the new hashing algorithm from block 400K, which will fall on the 10th of August 2014. Feathercoin has said that it will make an announcement on the timing of its hard fork in plenty of time for everyone to test the new miners and be sure that the community is ready for such a major shift. 
+
+Meet the team
+
+Peter Bushnell
+
+
+Peter Bushnell is the former Head of ICT at Brasenose college which is part of Oxford University. He is a keen enthusiast for crypto currency and has been involved in many projects the most known of which is Feathercoin for which he is lead developer. Peter lives by the open source ethos and believes that we are here to work together to progress the underlying software. It has been Peter’s task to oversee the development of Feathercoin and to make some of hard decisions to secure its future.
+
+John Doering
+
+
+John Doering has been with the Feathercoin development team since the early days. Leads the development on the new hashing algorithm called NeoScrypt. Contributes to all things technical when we are talking code, he and Bushnell work closely together hashing out the technical details with the other members of development team. He has also become the lead developer of Phoenixcoin and Orbitcoin after their original developers abandoned them.
+
+------------------------------------------------------------------------------------
+http://www.ftc-c.com/pack/neo-scrypt-press-release.pdf
+http://www.ftc-c.com/pack/neoscrypt_v1.pdf
+
+Neoscrypt, a Strong Memory Intensive Key Derivation Function
+Neoscrypt，一种超强的强化内存型加密算法
+
+ABSTRACT. Hereby presented a new password based memory intensive cryptographic solution designed for general purpose computer hardware. A particular 32-bit implementation is described and evaluated.
+摘要——特此呈现一款新的专为普通计算机硬件设计的内存密集型加密解决方案，它属于一个特殊的32位描述和评价。
+
+1.INTRODUCTION
+Password based key derivation function (KDF) is a deterministic algorithm used to derive a cryptographic key from an input datum known as a password. An additional input datum known as a salt may be employed in order to increase strength of the algorithm against attacks using pre-computed hashes also known as rainbow tables. The derived key length may be specified usually, and one of the most popular uses of KDFs is key stretching. It increases effective length of a user password by constructing an enhanced key to provide with a better resistance against brute force attacks. Another popular use is password storage. Keeping user passwords in unencrypted form is very undesired as it may be possible for an attacker to gain access to the password file and retrieve the passwords stored immediately.
+Brute force attacks may be the only possible approach against strong KDFs. This kind of attack can be parallelised usually to a great extent.High requirements on computational resources such as processor time and memory space allow to reduce parallelisation efficiency and keep these attacks expensive far beyond reasonable limits.
+As the name suggests, NeoScrypt is a further development of Scrypt as described in Percival. It is aimed at increased security and better performance on general purpose computer hardware while maintaining comparable costs and requirements. This document focuses on functional differences between NeoScrypt and Scrypt.
+
+2. SCRYPT SPECIFICATIONS
+The most popular implementation of Scrypt employed by many cryptocurrencies since 2011 is N = 1024, r = 1, p = 1 abbreviated usually to (1024, 1, 1). N is the primary parameter defining number
+of memory segments used and must be a power of 2. May be also described through Nfactor.
+N = (1 << (Nfactor + 1))
+Nfactor = lb(N) - 1
+The default memory segment size for the 32-bit implementation is 128 bytes. r is the segment size multiplier. p is the computational multiplier. They may be also described through rfactor and pfactor respectively.
+r = (1 << rfactor)
+p = (1 << pfactor)
+A single instance of Scrypt utilises (N + 2) * r * 128 bytes of memory space, i.e.128.25Kb for the (1024, 1, 1) configuration. Actual data mixing in memory is performed by Salsa20, a stream cipher introduced by Bernstein. A reduced strength 8-round implementation has been chosen (Salsa20/8). Every run of the Scrypt core engine executes it 4 * r * N times, i.e. 4096 times for the (1024,1, 1) configuration. Every execution of Salsa20 mixes one half of a memory segment with itself.The Scrypt core engine has no provisions for key stretching or compressing as well as salting, therefore additional cryptographic functions need to be deployed. In case of cryptocurrencies, a typical configuration operates with 80 bytes of input data (block header) which is also a salt. It is passed to PBKDF2, a password based KDF capable of deriving variable length keys with salting. It works with SHA-256, a cryptographic hash function delivering digests up to 32 bytes in size through 64 internal rounds. It doesn’t support keyed hashing, therefore a pseudorandom function (PRF) such as HMAC is required, and the whole big endian construction may be called PBKDF2-HMAC-SHA256. It feeds r * 128 bytes of derived data to the Scrypt core and receives it back after mixing to be used as a salt for another PBKDF2-HMAC-SHA256 run which compresses 80 bytes of
+input data into 32 bytes of hash.
+
+
+3. NEOSCRYPT SPECIFICATIONS
+Although a very innovative design back in time, Scrypt has developed certain vulnerabilities. The first announced differential cryptanalysis of Salsa20/8 by Tsunoo et al.in 2007 did not deliver any advantage over 256-bit brute force attack, but the following research by Aumasson et al. [6] reduced time complexity to break it from 2255 to 2251 with 50% success probability. It was improved by Shi et. al in 2012 to 2250. Although this is not critical yet, better attacks on Salsa20/8 may be developed in the future.
+
+PBKDF2 is a very popular KDF and may be configured to require considerably large amounts of processor time, but it does not require complex logic or significant amounts of memory to operate. Therefore brute force attacks can be carried out on general purpose hardware such as GPUs or custom designs (ASICs) with reasonably low costs.
+
+SHA-256 also allows numerous performance optimisations in this context. It is also worth to mention that Scrypt relies very little on PBKDF2-HMAC-SHA256 strength as it is configured to run in the fastest 1-iteration mode even though 1000-iteration minimum advised in general.
+
+NeoScrypt addresses these issues. The core engine is configured to employ non-reduced Salsa20 of 20 rounds (Salsa20/20) as well as non-reduced ChaCha20 of 20 rounds (ChaCha20/20). Both of them are used to produce the final salt as their outputs are XOR’ed into it. They may be configured to run either in series or parallel depending on application objectives. The default NeoScrypt configuration is (128,2,1). A single instance of NeoScrypt utilises (N + 3) * r * 128 bytes of memory space, i.e. 32.75Kb, in series mode or (2 * N + 3) * r * 128 bytes, i.e. 64.75Kb, in parallel mode. Every run of the NeoScrypt core engine executes Salsa20/20 and ChaCha20/20 1024 times each which might seem inferior to 4096 times of Salsa20/8 of the Scrypt core engine. However NeoScrypt operates with double the memory segment size requiring larger temporal buffers, also with higher round count of each stream cipher iteration as explained above. If approximated to abstract load/store units, NeoScrypt is 1.25 times more memory intensive than Scrypt.
+
+NeoScrypt解决了这些问题。核心引擎被配置为使用非还原的20轮（Salsa20/20），以及20轮（ChaCha20/20）的非还原ChaCha20 Salsa20。两者都被用于产生最终的盐如它们的输出异或到它。它们可以被配置成串联或并联取决于应用目标运行。默认NeoScrypt构型是（128,2,1）。NeoScrypt的单个实例利用（N +3）* R *128字节的存储器空间，即32.75Kb，在串联模式或（2 * N + 3）* R *128字节，即64.75Kb，在并行模式。在NeoScrypt核心引擎的每一次运行执行每一个似乎不如Salsa20的Scrypt核心引擎/8的4096次Salsa20/20和ChaCha20/201024次。然而NeoScrypt工作在两倍的存储器段的大小需要较大的时间缓冲，也与每个流密码迭代更高圆形计数，如上所述。如果近似于抽象的载入/存储单元，NeoScrypt是1.25倍的内存消耗比Scrypt。
+
+There are no known successful attacks on non-reduced Salsa20 and ChaCha20 other than exhaustive brute force search.NeoScrypt replaces SHA-256 with BLAKE2s which is a further development of BLAKE-256 [10], one of 5 NIST SHA-3 contest finalists. Based upon ChaCha20 , operates with a lower round count of 10, supports keyed hashing, is native little endian and faster significantly than SHA-256 and even BLAKE-256. It could be interfaced directly to PBKDF2 with no need of HMAC. However PBKDF2 constructs derived keys using blocks. It means a minor change in an input datum, such as nonce increment, may not result in an entirely different derived key. A replacement KDF has been developed to address this issue.
+
+有非还原Salsa20和ChaCha20比穷举蛮力search.NeoScrypt其他任何已知的攻击成功取代SHA-256与BLAKE2s是布莱克-256[10]，5 NIST SHA-3竞赛决赛一个的进一步发展。基于ChaCha20，工作于10较低的轮数，支持加密散列，是本地小尾数和更快的显著比SHA-256，甚至布莱克-256。它可以直接连接到PBKDF2无需HMAC的。然而PBKDF2构建体使用的块密钥。这意味着在输入数据轻微的变化，如随机数的增量，可能不会产生一个完全不同的派生密钥。的替换KDF已经发展到解决这个问题。
+
+FastKDF is a buffered password based KDF which also supports salting. It operates with 2 primary buffers for password and salt each.They must be a power of 2 in size and not less than any input
+(password, salt) or output (derived key) data. The default configuration works with 256-byte buffers. Password and salt are loaded initially into these buffers in a repetitive manner until the end of buffer is reached. The salt buffer is modified through operations while the password buffer remains constant. The buffer pointers are set to zero (start) on the first run. When a PRF chosen delivers a digest, a sum of all its bytes modulo buffer size defines the next buffer pointer. The digest is XOR’ed into the salt buffer at the new buffer pointer and the next iteration starts. If a read or write operation goes past a buffer end, it is continued from the buffer start. BLAKE2s is configured to operate with 64-byte input (password), 32-byte key (salt) and 32-byte output (digest). When the final FastKDF iteration is completed, the password buffer using zero buffer pointer is XOR’ed into the salt buffer using the last buffer pointer to produce the derived
+key of length required which is copied into the output buffer. FastKDF-BLAKE2s is configured to run through 32 iterations by default. It is little endian for easier deployment and additional minor performance advantage on popular general purpose computer hardware.
+
+4. CONCLUSIONS
+The primary functionality of NeoScrypt and Scrypt has been described and evaluated briefly without much mathematical detail to a cryptography amateur. Certain disadvantages of Scrypt have been
+outlined. Please refer to the source code and the original Scrypt documentation [1] for additional information should you need any.
+
+---------------------------------------------------------------------------------------------------
+#pragma unroll的用法
+http://blog.sina.com.cn/s/blog_953d801a0101ccgj.html
+使用#pragma unroll命令，编译器在进行编译时，遇到该命令就会对循环进行展开
+
+kernel void search
+核心函数，需要如何修改，给我一个提纲
+The core function, how to modify,please give me an outline .
+
+__kernel void search(__global const uint4 * restrict input,
+volatile __global uint*restrict output, __global uint4*restrict padcache,
+const uint4 midstate0, const uint4 midstate16, const uint target)
+
+How is develop cgminer for neoscrypt ?
+The opencl core function, how to modify ? please give me an outline if you can .
+NeoScrypt, a Strong Memory Intensive Key Derivation Function https://github.com/ghostlander/NeoScrypt
+
+How is develop a kernel for GPU miner ?
+
+My goal is to find suitable for our development path, not stop there, and not copied.
+https://forum.feathercoin.com/index.php?/topic/7396-a-proof-of-stake-protocol-v-20/
+
+minerd -o stratum+tcp://neo-test.nut2pools.com:3333 -u ChekaZ.1 -p x
+http://neo-test.nut2pools.com/ 
+
+http://prometheus.phoenixcoin.org:20554
+
+交易市场
+https://www.allcrypt.com/market?id=220
+
+M网 https://www.mintpal.com/    support@mintpal.com
+B网 https://www.bitfinex.com/
+Bittrex  https://bittrex.com/   Support@Zendesk  ,media@bittrex.com
+Poloniex https://poloniex.com/  poloniex@gmail.com
+
