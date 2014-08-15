@@ -223,12 +223,21 @@ if test "$found_opencl" = 1; then
 	if test "x$keccak" = xyes; then
 		AC_DEFINE([USE_KECCAK], [1], [Defined to 1 if keccak support is wanted])
 	fi
+
+	AC_ARG_ENABLE([neoscrypt],
+		[AC_HELP_STRING([--enable-neoscrypt],[Compile support for neoscrypt feathercoin mining (default disabled)])],
+		[neoscrypt=$enableval]
+		)
+	if test "x$neoscrypt" = xyes; then
+		AC_DEFINE([USE_NEOSCRYPT], [1], [Defined to 1 if neoscrypt support is wanted])
+	fi
 else
 	DLOPEN_FLAGS=""
 fi
 
 AM_CONDITIONAL([HAS_SCRYPT], [test x$scrypt = xyes])
 AM_CONDITIONAL([HAS_KECCAK], [test x$keccak = xyes])
+AM_CONDITIONAL([HAS_NEOSCRYPT], [test x$neoscrypt = xyes])
 
 bflsc="no"
 
@@ -448,6 +457,7 @@ AC_DEFINE_UNQUOTED([DIAKGCN_KERNNAME], ["diakgcn121016"], [Filename for diakgcn 
 AC_DEFINE_UNQUOTED([DIABLO_KERNNAME], ["diablo130302"], [Filename for diablo kernel])
 AC_DEFINE_UNQUOTED([SCRYPT_KERNNAME], ["scrypt130511"], [Filename for scrypt kernel])
 AC_DEFINE_UNQUOTED([KECCAK_KERNNAME], ["keccak130718"], [Filename for keccak kernel])
+AC_DEFINE_UNQUOTED([NEOSCRYPT_KERNNAME], ["neoscrypt140707"], [Filename for neoscrypt kernel])
 
 
 AC_SUBST(OPENCL_LIBS)
@@ -506,6 +516,11 @@ if test "x$opencl" != xno; then
 	else
 		echo "  keccak...............: Disabled"
 	fi
+	if test "x$neoscrypt" != xno; then
+		echo "  neoscrypt............: Enabled"
+	else
+		echo "  neoscrypt............: Disabled"
+	fi
 
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
@@ -514,6 +529,7 @@ if test "x$opencl" != xno; then
 		fi
 		echo "  scrypt...............: Disabled (needs OpenCL)"
 		echo "  keccak...............: Disabled (needs OpenCL)"
+		echo "  neoscrypt............: Disabled (needs OpenCL)"
 	fi
 else
 	echo "  OpenCL...............: Detection overrided. GPU mining support DISABLED"
@@ -522,6 +538,7 @@ else
 	fi
 	echo "  scrypt...............: Disabled (needs OpenCL)"
 	echo "  keccak...............: Disabled (needs OpenCL)"
+	echo "  neoscrypt............: Disabled (needs OpenCL)"
 fi
 
 if test "x$adl" != xno; then

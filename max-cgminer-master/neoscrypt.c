@@ -955,8 +955,9 @@ static void neoscrypt_blake2s(const void *input, const uint input_size, const vo
  * FASTKDF_BUFFER_SIZE must be a power of 2;
  * password_len, salt_len and output_len should not exceed FASTKDF_BUFFER_SIZE;
  * prf_output_size must be <= prf_key_size; */
-static void neoscrypt_fastkdf(const uchar *password, uint password_len, const uchar *salt, uint salt_len,
-  uint N, uchar *output, uint output_len) {
+static void neoscrypt_fastkdf(const uchar *password, uint password_len,
+							  const uchar *salt, uint salt_len,
+							  uint N, uchar *output, uint output_len) {
     const uint stack_align = 0x40, kdf_buf_size = FASTKDF_BUFFER_SIZE,
       prf_input_size = BLAKE2S_BLOCK_SIZE, prf_key_size = BLAKE2S_KEY_SIZE, prf_output_size = BLAKE2S_OUT_SIZE;
     uint bufptr, a, b, i, j;

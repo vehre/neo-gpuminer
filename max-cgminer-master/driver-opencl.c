@@ -124,7 +124,7 @@ char *set_worksize(char *arg)
 	return NULL;
 }
 
-#ifdef USE_SCRYPT
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 char *set_shaders(char *arg)
 {
 	int i, val = 0, device = 0;

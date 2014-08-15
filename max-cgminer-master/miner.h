@@ -529,7 +529,7 @@ struct cgpu_info {
 	enum cl_kernels kernel;
 	cl_ulong max_alloc;
 
-#ifdef USE_SCRYPT
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 	int opt_lg, lookup_gap;
 	size_t opt_tc, thread_concurrency;
 	size_t shaders;
@@ -1207,11 +1207,8 @@ typedef struct {
 	cl_uint B1addK6, PreVal0addK7, W16addK16, W17addK17;
 	cl_uint zeroA, zeroB;
 	cl_uint oneA, twoA, threeA, fourA, fiveA, sixA, sevenA;
-#ifdef USE_SCRYPT
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 	struct work *work;
-#endif
-#ifdef USE_NEOSCRYPT
-
 #endif
 #ifdef USE_KECCAK
 	unsigned char keccak_data[KECCAK_BUFFER_SIZE];
@@ -1388,11 +1385,8 @@ struct work {
 	unsigned char	target[32];
 	unsigned char	hash[32];
 
-#ifdef USE_SCRYPT
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 	unsigned char	device_target[32];
-#endif
-#ifdef USE_NEOSCRYPT
-
 #endif
 	double		device_diff;
 	uint64_t	share_diff;
