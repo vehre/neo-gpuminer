@@ -724,7 +724,8 @@ __kernel void search(__global const uint4* restrict input,
 	/* Z is a copy of X for ChaCha */
 	uchar Z[256];
 	/* V = CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE */
-	__global uchar *V= &padcache[CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE* get_global_id(0)];
+	__global uchar *V= &padcache[CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE*
+		(get_global_id(0)% CONCURRENT_THREADS)];
 	uint4 data = (uint4)(input[4].x, input[4].y, input[4].z, get_global_id(0));
 
     const uint mixmode = 0x14/*, stack_align = 0x40*/;

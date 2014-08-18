@@ -640,8 +640,8 @@ build:
 #endif
 #if defined(USE_NEOSCRYPT)
 	if (opt_neoscrypt)
-		sprintf(CompilerOptions, "-D WORKSIZE=%d",
-			/*(unsigned int)cgpu->thread_concurrency,*/ (int)clState->wsize);
+		sprintf(CompilerOptions, "-D CONCURRENT_THREADS=%d -D WORKSIZE=%d",
+			(unsigned int)cgpu->thread_concurrency, (int)clState->wsize);
 	else
 #endif
 	{

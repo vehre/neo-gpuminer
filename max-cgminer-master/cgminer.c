@@ -2736,6 +2736,10 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 
 	cgpu = get_thr_cgpu(thr_id);
 
+#ifdef USE_NEOSCRYPT
+	/* On neoscrypt everything is little endian. */
+	if(!opt_neoscrypt)
+#endif
 	endian_flip128(work->data, work->data);
 
 	/* build hex string */
