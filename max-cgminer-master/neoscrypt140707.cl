@@ -46,7 +46,7 @@ void neoscrypt_salsa(uint *X, uint rounds) {
 }
 
 /* ChaCha20, rounds must be a multiple of 2 */
-static void neoscrypt_chacha(uint *X, uint rounds) {
+void neoscrypt_chacha(uint *X, uint rounds) {
     uint x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, t;
 
     x0 = X[0];   x1 = X[1];   x2 = X[2];   x3 = X[3];
