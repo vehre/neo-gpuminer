@@ -2,8 +2,13 @@
 extern "C" {
 #endif
 
+#ifdef USE_NEOSCRYPT
+extern void neoscrypt_regenhash(struct work *work);
 void neoscrypt(const unsigned char *input, unsigned char *output, unsigned int profile);
-
+#else
+static inline void neoscrypt_regenhash(struct work *work) {}
+void neoscrypt(const unsigned char *input, unsigned char *output, unsigned int profile) {}
+#endif
 #if (__cplusplus)
 }
 #else

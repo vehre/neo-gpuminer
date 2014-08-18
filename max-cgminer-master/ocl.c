@@ -35,6 +35,7 @@
 #include "ocl.h"
 
 int opt_platform_id = -1;
+int opt_all_cldevices= 0; // when set to one, all cl devices (not only GPUs) will be available
 
 char *file_contents(const char *filename, int *length)
 {
@@ -120,7 +121,7 @@ int clDevicesNum(void) {
 		status = clGetPlatformInfo(platform, CL_PLATFORM_VERSION, sizeof(pbuff), pbuff, NULL);
 		if (status == CL_SUCCESS)
 			applog(LOG_INFO, "CL Platform %d version: %s", i, pbuff);
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
+		status = clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
 		if (status != CL_SUCCESS) {
 			applog(LOG_INFO, "Error %d: Getting Device IDs (num)", status);
 			continue;
@@ -134,7 +135,7 @@ int clDevicesNum(void) {
 			unsigned int j;
 			cl_device_id *devices = (cl_device_id *)malloc(numDevices*sizeof(cl_device_id));
 
-			clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
+			clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
 			for (j = 0; j < numDevices; j++) {
 				clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(pbuff), pbuff, NULL);
 				applog(LOG_INFO, "\t%i\t%s", j, pbuff);
@@ -258,7 +259,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	if (status == CL_SUCCESS)
 		applog(LOG_INFO, "CL Platform version: %s", vbuff);
 
-	status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
+	status = clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Getting Device IDs (num)", status);
 		return NULL;
@@ -269,7 +270,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 		/* Now, get the device list data */
 
-		status = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
+		status = clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: Getting Device IDs (list)", status);
 			return NULL;
@@ -306,7 +307,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 	cl_context_properties cps[3] = { CL_CONTEXT_PLATFORM, (cl_context_properties)platform, 0 };
 
-	clState->context = clCreateContextFromType(cps, CL_DEVICE_TYPE_GPU, NULL, NULL, &status);
+	clState->context = clCreateContextFromType(cps, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, NULL, NULL, &status);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Creating Context. (clCreateContextFromType)", status);
 		return NULL;
@@ -552,18 +553,19 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	strcat(binaryfilename, name);
 	if (clState->goffset)
 		strcat(binaryfilename, "g");
-	if (opt_scrypt) {
 #ifdef USE_SCRYPT
+	if (opt_scrypt) {
 		sprintf(numbuf, "lg%utc%u", cgpu->lookup_gap, (unsigned int)cgpu->thread_concurrency);
 		strcat(binaryfilename, numbuf);
+	} else
 #endif
-	} else if (opt_neoscrypt) {
 #ifdef USE_NEOSCRYPT
-		sprintf(numbuf, "lg%utc%u", cgpu->lookup_gap, (unsigned int)cgpu->thread_concurrency);
+	if (opt_neoscrypt) {
+		sprintf(numbuf, /*"lg%u*/ "tc%u", /*cgpu->lookup_gap,*/ (unsigned int)cgpu->thread_concurrency);
 		strcat(binaryfilename, numbuf);
+	} else
 #endif
-	}	
-	  else {
+	{
 		sprintf(numbuf, "v%d", clState->vwidth);
 		strcat(binaryfilename, numbuf);
 	}
@@ -639,7 +641,7 @@ build:
 #if defined(USE_NEOSCRYPT)
 	if (opt_neoscrypt)
 		sprintf(CompilerOptions, "-D WORKSIZE=%d",
-			cgpu->lookup_gap, (unsigned int)cgpu->thread_concurrency, (int)clState->wsize);
+			/*(unsigned int)cgpu->thread_concurrency,*/ (int)clState->wsize);
 	else
 #endif
 	{

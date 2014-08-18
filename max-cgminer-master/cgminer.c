@@ -118,6 +118,7 @@ int nDevs;
 int opt_dynamic_interval = 7;
 int opt_g_threads = -1;
 int gpu_threads;
+extern int opt_all_cldevices;
 #ifdef USE_SCRYPT
 bool opt_scrypt;
 #endif
@@ -1169,6 +1170,9 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--gpu-threads|-g",
 		     set_int_1_to_10, opt_show_intval, &opt_g_threads,
 		     "Number of threads per GPU (1 - 10)"),
+	OPT_WITHOUT_ARG("--opencl-all-devices",
+		     opt_set_bool, &opt_all_cldevices,
+		     "Enable opencl-computing on all devices (default is only on gpus)"),
 #ifdef HAVE_ADL
 	OPT_WITH_ARG("--gpu-engine",
 		     set_gpu_engine, NULL, NULL,
@@ -1362,14 +1366,13 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITHOUT_ARG("--scrypt",
 			opt_set_bool, &opt_scrypt,
 			"Use the scrypt algorithm for mining (litecoin only)"),
-	OPT_WITH_ARG("--shaders",
-		     set_shaders, NULL, NULL,
-		     "GPU shaders per card for tuning scrypt, comma separated"),
 #endif
 #ifdef USE_NEOSCRYPT
 	OPT_WITHOUT_ARG("--neoscrypt",
 			opt_set_bool, &opt_neoscrypt,
 			"Use then neoscrypt algorithm for mining (feathercoin only)"),
+#endif
+#if defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)
 	OPT_WITH_ARG("--shaders",
 		     set_shaders, NULL, NULL,
 		     "GPU shaders per card for tuning scrypt, comma separated"),
@@ -1417,7 +1420,7 @@ static struct opt_table opt_config_table[] = {
 			opt_hidden
 #endif
 	),
-#ifdef USE_SCRYPT
+#if defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)
 	OPT_WITH_ARG("--thread-concurrency",
 		     set_thread_concurrency, NULL, NULL,
 		     "Set GPU thread concurrency for scrypt mining, comma separated"),
@@ -2817,11 +2820,16 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 		unsigned char rhash[32];
 
 		swab256(rhash, work->hash);
+#ifdef USE_SCRYPT
 		if (opt_scrypt)
 			outhash = bin2hex(rhash + 2, 4);
-		else if (opt_scrypt)
+		else
+#endif
+#ifdef USE_NEOSCRYPT
+		if (opt_neoscrypt)
 			outhash = bin2hex(rhash + 2, 4);
 		else
+#endif
 			outhash = bin2hex(rhash + 4, 4);
 		suffix_string(work->share_diff, diffdisp, sizeof(diffdisp), 0);
 		snprintf(hashshow, sizeof(hashshow), "%s Diff %s/%d%s",
@@ -2863,8 +2871,19 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 
 			snprintf(worktime, sizeof(worktime),
 				" <-%08lx.%08lx M:%c D:%1.*f G:%02d:%02d:%02d:%1.3f %s (%1.3f) W:%1.3f (%1.3f) S:%1.3f R:%02d:%02d:%02d",
+#if defined(USE_SCRYPT)	&& defined(USE_NEOSCRYPT)
+				(unsigned long)swab32(*(uint32_t *)&(work->data[(opt_scrypt|| opt_neoscrypt) ? 32 : 28])),
+				(unsigned long)swab32(*(uint32_t *)&(work->data[(opt_scrypt|| opt_neoscrypt) ? 28 : 24])),
+#elif defined(USE_SCRYPT)
 				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_scrypt ? 32 : 28])),
 				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_scrypt ? 28 : 24])),
+#elif defined(USE_NEOSCRYPT)
+				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_neoscrypt ? 32 : 28])),
+				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_neoscrypt ? 28 : 24])),
+#else
+				(unsigned long)swab32(*(uint32_t *)&(work->data[28])),
+				(unsigned long)swab32(*(uint32_t *)&(work->data[24])),
+#endif
 				work->getwork_mode, diffplaces, work->work_difficulty,
 				tm_getwork.tm_hour, tm_getwork.tm_min,
 				tm_getwork.tm_sec, getwork_time, workclone,
@@ -3089,6 +3108,7 @@ static void calc_diff(struct work *work, int known)
 	struct cgminer_pool_stats *pool_stats = &(work->pool->cgminer_pool_stats);
 	double difficulty;
 
+#ifdef USE_SCRYPT
 	if (opt_scrypt) {
 		uint64_t *data64, d64;
 		char rtarget[32];
@@ -3099,7 +3119,10 @@ static void calc_diff(struct work *work, int known)
 		if (unlikely(!d64))
 			d64 = 1;
 		work->work_difficulty = diffone / d64;
-	} else if (opt_neoscrypt) {
+	} else
+#endif
+#ifdef USE_NEOSCRYPT
+	if (opt_neoscrypt) {
 		uint64_t *data64, d64;
 		char rtarget[32];
 
@@ -3109,8 +3132,9 @@ static void calc_diff(struct work *work, int known)
 		if (unlikely(!d64))
 			d64 = 1;
 		work->work_difficulty = diffone / d64;
-	}
-	  else if (!known) {
+	} else
+#endif
+	if (!known) {
 		double targ = 0;
 		int i;
 
@@ -3241,12 +3265,10 @@ static void __kill_work(void)
 #ifdef USE_USBUTILS
 	/* Best to get rid of it first so it doesn't
 	 * try to create any new devices */
-	if (!opt_scrypt) {
-			if (!opt_neoscrypt) {
-				forcelog(LOG_DEBUG, "Killing off HotPlug thread");
-				thr = &control_thr[hotplug_thr_id];
-				kill_timeout(thr);
-			}
+	if (!opt_scrypt && !opt_neoscrypt) {
+		forcelog(LOG_DEBUG, "Killing off HotPlug thread");
+		thr = &control_thr[hotplug_thr_id];
+		kill_timeout(thr);
 	}
 #endif
 
@@ -3290,15 +3312,13 @@ static void __kill_work(void)
 #ifdef USE_USBUTILS
 	/* Release USB resources in case it's a restart
 	 * and not a QUIT */
-	if (!opt_scrypt) {
-		if (!opt_neoscrypt) {
-			forcelog(LOG_DEBUG, "Releasing all USB devices");
-			cg_completion_timeout(&usb_cleanup, NULL, 1000);
-	
-			forcelog(LOG_DEBUG, "Killing off usbres thread");
-			thr = &control_thr[usbres_thr_id];
-			kill_timeout(thr);
-		}
+	if (!opt_scrypt &&!opt_neoscrypt) {
+		forcelog(LOG_DEBUG, "Releasing all USB devices");
+		cg_completion_timeout(&usb_cleanup, NULL, 1000);
+
+		forcelog(LOG_DEBUG, "Killing off usbres thread");
+		thr = &control_thr[usbres_thr_id];
+		kill_timeout(thr);
 	}
 #endif
 
@@ -3735,11 +3755,16 @@ static uint64_t share_diff(const struct work *work)
 	char rhash[32];
 
 	swab256(rhash, work->hash);
+#ifdef USE_SCRYPT
 	if (opt_scrypt)
 		data64 = (uint64_t *)(rhash + 2);
-	else if (opt_neoscrypt)
+	else
+#endif
+#ifdef USE_NEOSCRYPT
+	if (opt_neoscrypt)
 		data64 = (uint64_t *)(rhash + 2);
 	else
+#endif
 		data64 = (uint64_t *)(rhash + 4);
 	d64 = be64toh(*data64);
 	if (unlikely(!d64))
@@ -3776,11 +3801,17 @@ static void regen_hash(struct work *work)
 
 static void rebuild_hash(struct work *work)
 {
+#ifdef USE_SCRYPT
 	if (opt_scrypt)
 		scrypt_regenhash(work);
-	else if (opt_neoscrypt)
-		scrypt_regenhash(work);
-	else if (opt_keccak)
+	else
+#endif
+#ifdef USE_NEOSCRYPT
+	if (opt_neoscrypt)
+		neoscrypt_regenhash(work);
+	else
+#endif
+	if (opt_keccak)
 		keccak_regenhash(work);
 	else
 		regen_hash(work);
@@ -4055,11 +4086,16 @@ static void set_blockdiff(const struct work *work)
 	bits_shift = 32 - (int)bits[0];
 	memcpy(block_target + bits_shift, bits + 1, 3);
 
+#ifdef USE_SCRYPT
 	if (opt_scrypt)
 		data64 = (uint64_t *)(block_target + 2);
-	else if (opt_neoscrypt)
+	else
+#endif
+#ifdef USE_NEOSCRYPT
+	if (opt_neoscrypt)
 		data64 = (uint64_t *)(block_target + 2);
 	else
+#endif
 		data64 = (uint64_t *)(block_target + 4);
 	d64 = bswap_64(*data64);
 	if (unlikely(!d64))
@@ -5948,23 +5984,35 @@ void set_target(unsigned char *dest_target, double diff)
 		unsigned char rtarget[32];
 
 		memset(rtarget, 0, 32);
+#ifdef USE_SCRYPT
 		if (opt_scrypt)
 			data64 = (uint64_t *)(rtarget + 2);
-		else if (opt_neoscrypt)
+		else
+#endif
+#ifdef USE_NEOSCRYPT
+		if (opt_neoscrypt)
 			data64 = (uint64_t *)(rtarget + 2);
-    else if (opt_keccak)
-         data64 = (uint64_t *)(rtarget + 3);
+	    else
+#endif
+		if (opt_keccak)
+			data64 = (uint64_t *)(rtarget + 3);
 		else
 			data64 = (uint64_t *)(rtarget + 4);
 		*data64 = htobe64(h64);
 		swab256(target, rtarget);
 	} else {
 		/* Support for the classic all FFs just-below-1 diff */
+#ifdef USE_SCRYPT
 		if (opt_scrypt)
 			memset(target, 0xff, 30);
-		else if (opt_neoscrypt)
+		else
+#endif
+#ifdef USE_NEOSCRYPT
+		if (opt_neoscrypt)
 			memset(target, 0xff, 30);
-        else if (opt_keccak)
+        else
+#endif
+		if (opt_keccak)
             memset(target, 0xff, 29);
 		else
 			memset(target, 0xff, 28);
@@ -6147,10 +6195,17 @@ bool test_nonce(struct work *work, uint32_t nonce)
 	rebuild_hash(work);
 	flip32(hash2_32, work->hash);
 
-	diff1targ = opt_scrypt ? 0x0000ffffUL : (opt_keccak ? 0x000000ffUL : 0);
-	if (opt_neoscrypt) {
-		diff1targ = opt_neoscrypt ? 0x0000ffffUL : (opt_keccak ? 0x000000ffUL : 0);
-	}
+#ifdef USE_SCRYPT
+	if(opt_scrypt)
+		diff1targ= 0x0000ffffUL;
+	else
+#endif
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt)
+		diff1targ= 0x0000ffffUL;
+	else
+#endif
+		diff1targ= opt_keccak ? 0x000000ffUL : 0;
 	return (be32toh(hash2_32[7]) <= diff1targ);
 }
 
@@ -8017,11 +8072,14 @@ int main(int argc, char *argv[])
 	if (opt_benchmark) {
 		struct pool *pool;
 
+#ifdef USE_SCRYPT
 		if (opt_scrypt)
 			quit(1, "Cannot use benchmark mode with scrypt");
+#endif
+#ifdef USE_NEOSCRYPT
 		if (opt_neoscrypt)
 			quit(1, "Cannot use benchmark mode with neoscrypt");
-						
+#endif
 		pool = add_pool();
 		pool->rpc_url = malloc(255);
 		strcpy(pool->rpc_url, "Benchmark");
@@ -8068,10 +8126,17 @@ int main(int argc, char *argv[])
 	/* Use a shorter scantime for scrypt */
 	if (opt_scantime < 0)
 	{
-		opt_scantime = opt_scrypt ? 30 : 60;
-		if (opt_neoscrypt) {
-			opt_scantime = opt_neoscrypt ? 30 : 60;
-		}
+#ifdef USE_SCRYPT
+		if(opt_scrypt)
+			opt_scantime= 30;
+		else
+#endif
+#ifdef USE_NEOSCRYPT
+		if (opt_neoscrypt)
+			opt_scantime= 30;
+		else
+#endif
+			opt_scantime= 60;
 	}
 
 	total_control_threads = 9;
@@ -8085,7 +8150,19 @@ int main(int argc, char *argv[])
 	usb_initialise();
 
 	// before device detection
-	if (!opt_scrypt) {
+	if (
+#ifdef USE_SCRYPT
+	   !opt_scrypt
+#else
+		true
+#endif
+		&&
+#ifdef USE_NEOSCRYPT
+		!opt_neoscrypt
+#else
+		true
+#endif
+		) {
 		cgsem_init(&usb_resource_sem);
 		usbres_thr_id = 1;
 		thr = &control_thr[usbres_thr_id];
@@ -8098,11 +8175,17 @@ int main(int argc, char *argv[])
 	/* Use the DRIVER_PARSE_COMMANDS macro to fill all the device_drvs */
 	DRIVER_PARSE_COMMANDS(DRIVER_FILL_DEVICE_DRV)
 
+#ifdef USE_SCRYPT
 	if (opt_scrypt)
 		opencl_drv.drv_detect(false);
-	else if (opt_neoscrypt)
+	else
+#endif
+#ifdef USE_NEOSCRYPT
+	if (opt_neoscrypt)
 		opencl_drv.drv_detect(false);
-	else {
+	else
+#endif
+	{
 	/* Use the DRIVER_PARSE_COMMANDS macro to detect all devices */
 		DRIVER_PARSE_COMMANDS(DRIVER_DRV_DETECT_ALL)
 	}
@@ -8356,14 +8439,24 @@ begin_bench:
 		quit(1, "API thread create failed");
 
 #ifdef USE_USBUTILS
-	if (!opt_scrypt) {
-		if (!opt_neoscrypt) {
-				hotplug_thr_id = 7;
-				thr = &control_thr[hotplug_thr_id];
-				if (thr_info_create(thr, NULL, hotplug_thread, thr))
-					quit(1, "hotplug thread create failed");
-				pthread_detach(thr->pth);
-		}
+	if(
+#ifdef USE_SCRYPT
+	   !opt_scrypt
+#else
+		true
+#endif
+		&&
+#ifdef USE_NEOSCRYPT
+		!opt_neoscrypt
+#else
+		true
+#endif
+	) {
+			hotplug_thr_id = 7;
+			thr = &control_thr[hotplug_thr_id];
+			if (thr_info_create(thr, NULL, hotplug_thread, thr))
+				quit(1, "hotplug thread create failed");
+			pthread_detach(thr->pth);
 	}
 #endif
 

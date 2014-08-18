@@ -1269,6 +1269,19 @@ void neoscrypt(const uchar *password, uchar *output, uint profile) {
 
 }
 
+/* 131583 rounded up to 4 byte alignment */
+#define SCRATCHBUF_SIZE	(131584)
+
+void neoscrypt_regenhash(struct work *work)
+{
+	uchar output[32];
+
+	//be32enc_vect(data, (const uint32_t *)work->data, 19);
+	//data[19] = htobe32(*nonce);
+	//scratchbuf = alloca(SCRATCHBUF_SIZE);
+	neoscrypt(work->data, output, 0x80000620);
+	//flip32(ohash, ohash);
+}
 
 #if (NEOSCRYPT_TEST)
 

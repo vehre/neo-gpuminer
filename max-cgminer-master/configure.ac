@@ -192,6 +192,7 @@ AC_ARG_ENABLE([adl],
 
 scrypt="no"
 keccak="no"
+neoscrypt="yes" dnl Currently set this to be active by default
 
 if test "$found_opencl" = 1; then
 	if test "x$adl" != xno; then
@@ -224,8 +225,12 @@ if test "$found_opencl" = 1; then
 		AC_DEFINE([USE_KECCAK], [1], [Defined to 1 if keccak support is wanted])
 	fi
 
+dnl	AC_ARG_ENABLE([neoscrypt],
+dnl		[AC_HELP_STRING([--enable-neoscrypt],[Compile support for neoscrypt feathercoin mining (default disabled)])],
+dnl		[neoscrypt=$enableval]
+dnl		)
 	AC_ARG_ENABLE([neoscrypt],
-		[AC_HELP_STRING([--enable-neoscrypt],[Compile support for neoscrypt feathercoin mining (default disabled)])],
+		[AC_HELP_STRING([--disable-neoscrypt],[Omit support for neoscrypt feathercoin mining (default enabled)])],
 		[neoscrypt=$enableval]
 		)
 	if test "x$neoscrypt" = xyes; then
