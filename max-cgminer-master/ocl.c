@@ -340,7 +340,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		clState->hasBitAlign = true;
 		
 	/* Check for OpenCL >= 1.0 support, needed for global offset parameter usage. */
-	char * devoclver = malloc(1024);
+	char *devoclver= malloc(1024);
 	const char * ocl10 = "OpenCL 1.0";
 	const char * ocl11 = "OpenCL 1.1";
 
@@ -356,6 +356,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		if (!find)
 			clState->hasOpenCL12plus = true;
 	}
+	free(devoclver);
 
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT, sizeof(cl_uint), (void *)&preferred_vwidth, NULL);
 	if (status != CL_SUCCESS) {
@@ -393,14 +394,13 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		if (opt_scrypt) {
 			applog(LOG_INFO, "Selecting scrypt kernel");
 			clState->chosen_kernel = KL_SCRYPT;
-		} else if (opt_keccak) {
-			applog(LOG_INFO, "Selecting keccak kernel");
-			clState->chosen_kernel = KL_KECCAK;
 		} else if (opt_neoscrypt) {
 			applog(LOG_INFO, "Selecting neoscrypt kernel");
 			clState->chosen_kernel = KL_NEOSCRYPT;
-		} 		
-		else if (!strstr(name, "Tahiti") &&
+		} else if (opt_keccak) {
+			applog(LOG_INFO, "Selecting keccak kernel");
+			clState->chosen_kernel = KL_KECCAK;		
+		} else if (!strstr(name, "Tahiti") &&
 			/* Detect all 2.6 SDKs not with Tahiti and use diablo kernel */
 			(strstr(vbuff, "844.4") ||  // Linux 64 bit ATI 2.6 SDK
 			 strstr(vbuff, "851.4") ||  // Windows 64 bit ""
@@ -502,8 +502,8 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		clState->wsize = (clState->max_work_size <= 256 ? clState->max_work_size : 256) / clState->vwidth;
 	cgpu->work_size = clState->wsize;
 
-#ifdef USE_SCRYPT
-	if (opt_scrypt) {
+#if defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)
+	if (opt_scrypt|| opt_neoscrypt) {
 		if (!cgpu->opt_lg) {
 			applog(LOG_DEBUG, "GPU %d: selecting lookup gap of 2", gpu);
 			cgpu->lookup_gap = 2;
@@ -525,31 +525,6 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 			cgpu->thread_concurrency = cgpu->opt_tc;
 	}
 #endif
-
-#ifdef USE_NEOSCRYPT
-	if (opt_neoscrypt) {
-		if (!cgpu->opt_lg) {
-			applog(LOG_DEBUG, "GPU %d: selecting lookup gap of 2", gpu);
-			cgpu->lookup_gap = 2;
-		} else
-			cgpu->lookup_gap = cgpu->opt_lg;
-
-		if (!cgpu->opt_tc) {
-			unsigned int sixtyfours;
-
-			sixtyfours =  cgpu->max_alloc / 131072 / 64 - 1;
-			cgpu->thread_concurrency = sixtyfours * 64;
-			if (cgpu->shaders && cgpu->thread_concurrency > cgpu->shaders) {
-				cgpu->thread_concurrency -= cgpu->thread_concurrency % cgpu->shaders;
-				if (cgpu->thread_concurrency > cgpu->shaders * 5)
-					cgpu->thread_concurrency = cgpu->shaders * 5;
-			}
-			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d", gpu, (int)(cgpu->thread_concurrency));
-		} else
-			cgpu->thread_concurrency = cgpu->opt_tc;
-	}
-#endif
-
 	FILE *binaryfile;
 	size_t *binary_sizes;
 	char **binaries;
@@ -655,20 +630,18 @@ build:
 	/* create a cl program executable for all the devices specified */
 	char *CompilerOptions = calloc(1, 256);
 
-#ifdef USE_SCRYPT
+#if defined(USE_SCRYPT)
 	if (opt_scrypt)
 		sprintf(CompilerOptions, "-D LOOKUP_GAP=%d -D CONCURRENT_THREADS=%d -D WORKSIZE=%d",
 			cgpu->lookup_gap, (unsigned int)cgpu->thread_concurrency, (int)clState->wsize);
 	else
 #endif
-
-#ifdef USE_NEOSCRYPT
+#if defined(USE_NEOSCRYPT)
 	if (opt_neoscrypt)
-		sprintf(CompilerOptions, "-D LOOKUP_GAP=%d -D CONCURRENT_THREADS=%d -D WORKSIZE=%d",
+		sprintf(CompilerOptions, "-D WORKSIZE=%d",
 			cgpu->lookup_gap, (unsigned int)cgpu->thread_concurrency, (int)clState->wsize);
 	else
 #endif
-
 	{
 		sprintf(CompilerOptions, "-D WORKSIZE=%d -D VECTORS%d -D WORKVEC=%d",
 			(int)clState->wsize, clState->vwidth, (int)clState->wsize * clState->vwidth);
@@ -924,6 +897,7 @@ built:
 			applog(LOG_ERR, "Error %d: clCreateBuffer (CLbuffer0)", status);
 			return NULL;
 		}
+		applog(LOG_DEBUG, "Creating neoscrypt output buffer sized %d", SCRYPT_BUFFERSIZE);
 		clState->outputBuffer = clCreateBuffer(clState->context, CL_MEM_WRITE_ONLY, SCRYPT_BUFFERSIZE, NULL, &status);
 	} else
 #endif

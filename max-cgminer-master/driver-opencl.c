@@ -1143,8 +1143,8 @@ static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __mayb
 	CL_SET_ARG(clState->CLbuffer0);
 	CL_SET_ARG(clState->outputBuffer);
 	CL_SET_ARG(clState->padbuffer8);
-	CL_SET_VARG(4, &midstate[0]);
-	CL_SET_VARG(4, &midstate[16]);
+//	CL_SET_VARG(4, &midstate[0]);
+//	CL_SET_VARG(4, &midstate[16]);
 	CL_SET_ARG(le_target);
 
 	return status;
@@ -1156,12 +1156,10 @@ static void set_threads_hashes(unsigned int vectors,int64_t *hashes, size_t *glo
 	unsigned int threads = 0;
 
 	while (threads < minthreads) {
-		if (opt_scrypt) {
-			threads = 1 << ((opt_scrypt ? 0 : 15) + *intensity);
+		if (opt_scrypt || opt_neoscrypt) {
+//			threads = 1 << (((opt_scrypt|| opt_neoscrypt) ? 0 : 15) + *intensity);
+			threads = 1 << *intensity;
 		}
-		if (opt_neoscrypt) {
-			threads = 1 << ((opt_neoscrypt ? 0 : 15) + *intensity);
-		}		
 		if (threads < minthreads) {
 			if (likely(*intensity < MAX_INTENSITY))
 				(*intensity)++;
@@ -1485,10 +1483,7 @@ static bool opencl_thread_init(struct thr_info *thr)
 	cl_int status = 0;
 	thrdata = calloc(1, sizeof(*thrdata));
 	thr->cgpu_data = thrdata;
-	int buffersize = opt_scrypt ? SCRYPT_BUFFERSIZE : BUFFERSIZE;
-	if (opt_neoscrypt) {
-		buffersize = opt_neoscrypt ? SCRYPT_BUFFERSIZE : BUFFERSIZE;
-	}
+	int buffersize = (opt_scrypt|| opt_neoscrypt) ? SCRYPT_BUFFERSIZE : BUFFERSIZE;
 
 	if (!thrdata) {
 		applog(LOG_ERR, "Failed to calloc in opencl_thread_init");
@@ -1586,12 +1581,8 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
 	size_t globalThreads[1];
 	size_t localThreads[1] = { clState->wsize };
 	int64_t hashes;
-	int found = opt_scrypt ? SCRYPT_FOUND : FOUND;
-	int buffersize = opt_scrypt ? SCRYPT_BUFFERSIZE : BUFFERSIZE;
-	if (opt_neoscrypt) {
-			found = opt_neoscrypt ? SCRYPT_FOUND : FOUND;
-			buffersize = opt_neoscrypt ? SCRYPT_BUFFERSIZE : BUFFERSIZE;		
-	}
+	int found = (opt_scrypt|| opt_neoscrypt) ? SCRYPT_FOUND : FOUND;
+	int buffersize = (opt_scrypt|| opt_neoscrypt) ? SCRYPT_BUFFERSIZE : BUFFERSIZE;
 
 	/* Windows' timer resolution is only 15ms so oversample 5x */
 	if (gpu->dynamic && (++gpu->intervals * dynamic_us) > 70000) {

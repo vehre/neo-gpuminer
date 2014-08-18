@@ -19,7 +19,7 @@ typedef struct {
 	cl_command_queue commandQueue;
 	cl_program program;
 	cl_mem outputBuffer;
-#ifdef USE_SCRYPT
+#if defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)
 	cl_mem CLbuffer0;
 	cl_mem padbuffer8;
 	size_t padbufsize;
@@ -28,15 +28,6 @@ typedef struct {
 #ifdef USE_KECCAK
 	cl_mem keccak_CLbuffer; /* KECCAK_BUFFER_SIZE bytes */
 #endif
-#ifdef USE_NEOSCRYPT
-	// Copied from SCRYPT
-
-	cl_mem CLbuffer0;
-	cl_mem padbuffer8;
-	size_t padbufsize;
-	void * cldata;
-#endif
-
 	bool hasBitAlign;
 	bool hasOpenCL11plus;
 	bool hasOpenCL12plus;

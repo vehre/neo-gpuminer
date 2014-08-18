@@ -6,8 +6,10 @@
 #define ROTR32(a,b) (((a) >> (b)) | ((a) << (32 - b)))
 #define ROTL32(a,b) rotate(a,b)
 
-#define STACK_ALIGN 0x40
-#define BLOCK_SIZE 64
+__constant uint ES[2] = { 0x00FF00FF, 0xFF00FF00 };
+#define EndianSwap(n) (rotate(n & ES[0], 24U)|rotate(n & ES[1], 8U))
+
+#define BLOCK_SIZE 64U
 
 /* Salsa20, rounds must be a multiple of 2 */
 void neoscrypt_salsa(uint *X, uint rounds) {
@@ -95,13 +97,25 @@ void neoscrypt_blkcpy(void *dstp, const void *srcp, uint len) {
 //        dst[i + 3] = src[i + 3];
     }
 }
+void neoscrypt_gl_blkcpy(__global void *dstp, const void *srcp, uint len) {
+    __global OPTIMAL_TYPE *dst = (__global OPTIMAL_TYPE *) dstp;
+    OPTIMAL_TYPE *src = (OPTIMAL_TYPE *) srcp;
+    uint i;
+
+    for(i = 0; i < (len / sizeof(OPTIMAL_TYPE)); i += 2) {
+        dst[i]     = src[i];
+        dst[i + 1] = src[i + 1];
+//        dst[i + 2] = src[i + 2];
+//        dst[i + 3] = src[i + 3];
+    }
+}
 
 /* Fast 32-bit / 64-bit block swapper;
  * len must be a multiple of 32 bytes */
 void neoscrypt_blkswp(void *blkAp, void *blkBp, uint len) {
     OPTIMAL_TYPE *blkA = (OPTIMAL_TYPE *) blkAp;
     OPTIMAL_TYPE *blkB = (OPTIMAL_TYPE *) blkBp;
-    register OPTIMAL_TYPE t0, t1; //, t2, t3;
+    OPTIMAL_TYPE t0, t1; //, t2, t3;
     uint i;
 
     for(i = 0; i < (len / sizeof(OPTIMAL_TYPE)); i += 2) {
@@ -135,6 +149,19 @@ void neoscrypt_blkxor(void *dstp, const void *srcp, uint len) {
     }
 }
 
+void neoscrypt_gl_blkxor(void *dstp, __global void *srcp, uint len) {
+    OPTIMAL_TYPE *dst = (OPTIMAL_TYPE *) dstp;
+    __global OPTIMAL_TYPE *src = (__global OPTIMAL_TYPE *) srcp;
+    uint i;
+
+    for(i = 0; i < (len / sizeof(OPTIMAL_TYPE)); i += 2) {
+        dst[i]     ^= src[i];
+        dst[i + 1] ^= src[i + 1];
+//        dst[i + 2] ^= src[i + 2];
+//        dst[i + 3] ^= src[i + 3];
+    }
+}
+
 /* 32-bit / 64-bit / 128-bit optimised memcpy() */
 void neoscrypt_copy(void *dstp, const void *srcp, uint len) {
     OPTIMAL_TYPE *dst = (OPTIMAL_TYPE *) dstp;
@@ -151,6 +178,24 @@ void neoscrypt_copy(void *dstp, const void *srcp, uint len) {
 
         for(i = len - tail; i < len; i++)
           dstb[i] = srcb[i];
+    }
+}
+
+/* 32-bit / 64-bit / 128-bit optimised memcpy() */
+void neoscrypt_gl_copy(__global uchar *dstp, const void *srcp, uint len) {
+    __global OPTIMAL_TYPE *dst = (__global OPTIMAL_TYPE *) dstp;
+    OPTIMAL_TYPE *src = (OPTIMAL_TYPE *) srcp;
+    uint i, tail;
+
+    for(i = 0; i < (len / sizeof(OPTIMAL_TYPE)); i++)
+      dst[i] = src[i];
+
+    tail = len & (sizeof(OPTIMAL_TYPE) - 1);
+    if(tail) {
+        uchar *srcb = (uchar *) srcp;
+
+        for(i = len - tail; i < len; i++)
+          dstp[i] = srcb[i];
     }
 }
 
@@ -375,71 +420,133 @@ void blake2s(const void *input, const uint input_size,
  * prf_output_size must be <= prf_key_size; */
 void fastkdf(const uint4 password, const uint4 salt,
 			 uint N, uchar *output, uint output_len) {
+	// BLOCK_SIZE            64U
+	// FASTKDF_BUFFER_SIZE  256U
+	// BLAKE2S_BLOCK_SIZE    64U
+	// BLAKE2S_KEY_SIZE      32U
+	// BLAKE2S_OUT_SIZE      32U
 
-
-	// BLOCK_SIZE 64
-	// FASTKDF_BUFFER_SIZE 256
-	// BLAKE2S_BLOCK_SIZE 64
-
-    const uint stack_align = 0x40, kdf_buf_size = FASTKDF_BUFFER_SIZE,
-      prf_input_size = BLAKE2S_BLOCK_SIZE, prf_key_size = BLAKE2S_KEY_SIZE,
-	  prf_output_size = BLAKE2S_OUT_SIZE;
+    uint4 A[(FASTKDF_BUFFER_SIZE + BLAKE2S_BLOCK_SIZE)/ sizeof(uint4)],
+		B[(FASTKDF_BUFFER_SIZE + BLAKE2S_KEY_SIZE)/ sizeof(uint4)];
+	uchar prf_output[BLAKE2S_OUT_SIZE];
+	uchar *prf_input, *prf_key, *ucBptr, *ucAptr;
     uint bufidx, a, b, i, j;
-	// hP1, hP2 is just a helper to iterate through arrays.
-    uint4 *A, *hP1, *hP2, *B;
-	uchar *prf_input, *prf_key, *prf_output, *ucBptr, *ucAptr;
 
-// password_len is 4*4= 16 byte, i.e. a copy is done copying the unit4
+	// password_len is 4*4= 16 byte, i.e. a copy is done copying the unit4
+    /* Initialise the password and salt buffer */
+	{
+		// Some pointers to help iterating
+		uint4 *hP1= A, *hP2= B;
 
-    /* Align and set up the buffers in stack */
-    uchar stack[2 * FASTKDF_BUFFER_SIZE + BLAKE2S_BLOCK_SIZE +
-				BLAKE2S_KEY_SIZE + BLAKE2S_OUT_SIZE + STACK_ALIGN];
-    A          = (uint4 *)&stack[stack_align & ~(stack_align - 1)];
-    B          = (uint4 *)&A[(kdf_buf_size + prf_input_size)/ sizeof(uint4)];
-    prf_output = (uchar *)&A[(2 * kdf_buf_size + prf_input_size + prf_key_size)/ sizeof(uint4)];
-
-    /* Initialise the password buffer */
-    //if(password_len > kdf_buf_size)
-    //   password_len = kdf_buf_size;
-
-    //a = kdf_buf_size / 16 aka password_len;
-	hP1= A;
-	hP2= B;
-	// kdf_buf_size>> (sizeof(uint4)>> 2) means:
-	// kdf_buf_size/ (sizeof(uint4)/ 4) but bitshifts are usually faster
+		// kdf_buf_size>> (sizeof(uint4)>> 2) means:
+		// kdf_buf_size/ (sizeof(uint4)/ 4) but bitshifts are usually faster
 #pragma unroll
-    for(i = kdf_buf_size>> (sizeof(uint4)>> 2); i; --i, ++hP1, ++hP2) {
-		// neoscrypt_copy(&A[i * password_len], &password[0], password_len);
-		*hP1= password;
-		*hP2= salt;
+		for(i = (FASTKDF_BUFFER_SIZE>> (sizeof(uint4)>> 2)); i; --i, ++hP1, ++hP2) {
+			// neoscrypt_copy(&A[i * password_len], &password[0], password_len);
+			*hP1= password;
+			*hP2= salt;
+		}
+
+		//neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], &password[0], prf_input_size);
+#pragma unroll
+		for(i= BLAKE2S_BLOCK_SIZE>> (sizeof(uint4)>> 2); i; --i, ++hP1)
+			*hP1= password;
+#pragma unroll
+		for(i= BLAKE2S_KEY_SIZE>> (sizeof(uint4)>> 2); i; --i, ++hP2)
+			*hP2= salt;
 	}
-    /* kdf_buf_size divides evenly by password_len, no need for this
-	b = kdf_buf_size - a * password_len;
-    if(b)
-      neoscrypt_copy(&A[a * password_len], &password[0], b); */
+	ucAptr= (uchar *)A;
+	ucBptr= (uchar *)B;
+    /* The primary iteration */
+    for(i = 0, bufidx = 0; i < N; i++) {
 
-	//neoscrypt_copy(&A[kdf_buf_size], &password[0], prf_input_size);
-	hP1= &A[kdf_buf_size>> (sizeof(uint4)>> 2)];
-	hP2= &B[kdf_buf_size>> (sizeof(uint4)>> 2)];
+        /* Map the PRF input buffer */
+        prf_input = &ucAptr[bufidx];
+
+        /* Map the PRF key buffer */
+        prf_key = &ucBptr[bufidx];
+
+        /* PRF */
+        blake2s(prf_input, BLAKE2S_BLOCK_SIZE,
+				prf_key, BLAKE2S_KEY_SIZE,
+				prf_output, BLAKE2S_OUT_SIZE);
+
+        /* Calculate the next buffer pointer */
+        for(j = 0, bufidx = 0; j< BLAKE2S_OUT_SIZE; j++)
+			bufidx += prf_output[j];
+        bufidx &= (FASTKDF_BUFFER_SIZE - 1);
+
+        /* Modify the salt buffer */
+        neoscrypt_xor(&ucBptr[bufidx], &prf_output[0], BLAKE2S_OUT_SIZE);
+
+        /* Head modified, tail updated */
+        if(bufidx < BLAKE2S_KEY_SIZE)
+          neoscrypt_copy(&ucBptr[FASTKDF_BUFFER_SIZE + bufidx], &B[bufidx],
+				min(BLAKE2S_OUT_SIZE, BLAKE2S_KEY_SIZE- bufidx));
+
+        /* Tail modified, head updated */
+        if((FASTKDF_BUFFER_SIZE - bufidx) < BLAKE2S_OUT_SIZE)
+          neoscrypt_copy(ucBptr, &ucBptr[FASTKDF_BUFFER_SIZE],
+				BLAKE2S_OUT_SIZE - (FASTKDF_BUFFER_SIZE - bufidx));
+    }
+
+    /* Modify and copy into the output buffer */
+    if(output_len > FASTKDF_BUFFER_SIZE)
+       output_len= FASTKDF_BUFFER_SIZE;
+
+    a = FASTKDF_BUFFER_SIZE - bufidx;
+    if(a >= output_len) {
+        neoscrypt_xor(&ucBptr[bufidx], ucAptr, output_len);
+        neoscrypt_copy(&output[0], &ucBptr[bufidx], output_len);
+    } else {
+        neoscrypt_xor(&ucBptr[bufidx], ucAptr, a);
+        neoscrypt_xor(ucBptr, &ucAptr[a], output_len - a);
+        neoscrypt_copy(&output[0], &ucBptr[bufidx], a);
+        neoscrypt_copy(&output[a], ucBptr, output_len - a);
+    }
+}
+
+/* FastKDF, a fast buffered key derivation function:
+ * FASTKDF_BUFFER_SIZE must be a power of 2;
+ * password_len, salt_len and output_len should not exceed FASTKDF_BUFFER_SIZE;
+ * prf_output_size must be <= prf_key_size; */
+void fastkdf_ext_salt(const uint4 password, const uchar *salt,
+			 uint N, __global uchar *output, uint output_len) {
+
+	// BLOCK_SIZE            64U
+	// FASTKDF_BUFFER_SIZE  256U
+	// BLAKE2S_BLOCK_SIZE    64U
+	// BLAKE2S_KEY_SIZE      32U
+	// BLAKE2S_OUT_SIZE      32U
+
+    uint4 A[(FASTKDF_BUFFER_SIZE + BLAKE2S_BLOCK_SIZE)/ sizeof(uint4)],
+		B[(FASTKDF_BUFFER_SIZE + BLAKE2S_KEY_SIZE)/ sizeof(uint4)];
+	uchar prf_output[BLAKE2S_OUT_SIZE];
+	uchar *prf_input, *prf_key, *ucBptr, *ucAptr;
+    uint bufidx, a, b, i, j;
+
+	// password_len is 4*4= 16 byte, i.e. a copy is done copying the unit4
+    /* Initialise the password and salt buffer */
+	{
+		// Some pointers to help iterating
+		uint4 *hP1= A;
+
+		// kdf_buf_size>> (sizeof(uint4)>> 2) means:
+		// kdf_buf_size/ (sizeof(uint4)/ 4) but bitshifts are usually faster
 #pragma unroll
-	for(i= prf_input_size>> (sizeof(uint4)>> 2); i; --i, ++hP1, ++hP2) {
-		*hP1= password;
-		*hP2= salt;
+		for(i = (FASTKDF_BUFFER_SIZE>> (sizeof(uint4)>> 2)); i; --i, ++hP1)
+			// neoscrypt_copy(&A[i * password_len], &password[0], password_len);
+			*hP1= password;
+
+		//neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], &password[0], prf_input_size);
+#pragma unroll
+		for(i= BLAKE2S_BLOCK_SIZE>> (sizeof(uint4)>> 2); i; --i, ++hP1)
+			*hP1= password;
 	}
 
     /* Initialise the salt buffer */
-    //if(salt_len > kdf_buf_size)
-    //  salt_len = kdf_buf_size;
-
-    /* Done in the loop above where A is initialized.
-	a = kdf_buf_size / salt_len;
-    for(i = 0; i < a; i++)
-      neoscrypt_copy(&B[i * salt_len], &salt[0], salt_len);
-
-    b = kdf_buf_size - a * salt_len;
-    if(b)
-      neoscrypt_copy(&B[a * salt_len], &salt[0], b);
-    neoscrypt_copy(&B[kdf_buf_size], &salt[0], prf_key_size); */
+	neoscrypt_copy(B, salt, FASTKDF_BUFFER_SIZE);
+    neoscrypt_copy(((uchar *)B)+ FASTKDF_BUFFER_SIZE, salt, BLAKE2S_KEY_SIZE);
 
 	ucAptr= (uchar *)A;
 	ucBptr= (uchar *)B;
@@ -453,45 +560,49 @@ void fastkdf(const uint4 password, const uint4 salt,
         prf_key = &ucBptr[bufidx];
 
         /* PRF */
-        blake2s(prf_input, prf_input_size, prf_key, prf_key_size, prf_output, prf_output_size);
+        blake2s(prf_input, BLAKE2S_BLOCK_SIZE,
+			prf_key, BLAKE2S_KEY_SIZE,
+			prf_output, BLAKE2S_OUT_SIZE);
 
         /* Calculate the next buffer pointer */
-        for(j = 0, bufidx = 0; j < prf_output_size; j++)
+        for(j = 0, bufidx = 0; j < BLAKE2S_OUT_SIZE; j++)
 			bufidx += prf_output[j];
-        bufidx &= (kdf_buf_size - 1);
+        bufidx &= (FASTKDF_BUFFER_SIZE - 1);
 
         /* Modify the salt buffer */
-        neoscrypt_xor(&ucBptr[bufidx], &prf_output[0], prf_output_size);
+        neoscrypt_xor(&ucBptr[bufidx], &prf_output[0], BLAKE2S_OUT_SIZE);
 
         /* Head modified, tail updated */
-        if(bufidx < prf_key_size)
-          neoscrypt_copy(&ucBptr[kdf_buf_size + bufidx], &B[bufidx], min(prf_output_size, prf_key_size - bufidx));
+        if(bufidx < BLAKE2S_KEY_SIZE)
+			neoscrypt_copy(&ucBptr[FASTKDF_BUFFER_SIZE + bufidx], &B[bufidx],
+				min(BLAKE2S_OUT_SIZE, BLAKE2S_KEY_SIZE - bufidx));
 
         /* Tail modified, head updated */
-        if((kdf_buf_size - bufidx) < prf_output_size)
-          neoscrypt_copy(ucBptr, &ucBptr[kdf_buf_size], prf_output_size - (kdf_buf_size - bufidx));
+        if((FASTKDF_BUFFER_SIZE - bufidx) < BLAKE2S_OUT_SIZE)
+			neoscrypt_copy(ucBptr, &ucBptr[FASTKDF_BUFFER_SIZE],
+				BLAKE2S_OUT_SIZE - (FASTKDF_BUFFER_SIZE - bufidx));
 
     }
 
     /* Modify and copy into the output buffer */
-    if(output_len > kdf_buf_size)
-       output_len = kdf_buf_size;
+    if(output_len > FASTKDF_BUFFER_SIZE)
+       output_len = FASTKDF_BUFFER_SIZE;
 
-    a = kdf_buf_size - bufidx;
+    a = FASTKDF_BUFFER_SIZE - bufidx;
     if(a >= output_len) {
         neoscrypt_xor(&ucBptr[bufidx], ucAptr, output_len);
-        neoscrypt_copy(&output[0], &ucBptr[bufidx], output_len);
+        neoscrypt_gl_copy(output, &ucBptr[bufidx], output_len);
     } else {
         neoscrypt_xor(&ucBptr[bufidx], ucAptr, a);
         neoscrypt_xor(ucBptr, &ucAptr[a], output_len - a);
-        neoscrypt_copy(&output[0], &ucBptr[bufidx], a);
-        neoscrypt_copy(&output[a], ucBptr, output_len - a);
+        neoscrypt_gl_copy(output, &ucBptr[bufidx], a);
+        neoscrypt_gl_copy(&output[a], ucBptr, output_len - a);
     }
 }
 
 
 /* Configurable optimised block mixer */
-void neoscrypt_blkmix(uint *X, uint *Y, uint r, uint mixmode) {
+void neoscrypt_blkmix(uint *X, /*uint *Y, uint r,*/ uint mixmode) {
     uint i, mixer, rounds;
 
     mixer  = mixmode >> 8;
@@ -505,7 +616,7 @@ void neoscrypt_blkmix(uint *X, uint *Y, uint r, uint mixmode) {
          Xa" = Ya; Xb" = Yc;
          Xc" = Yb; Xd" = Yd; */
 
-    if(r == 1) {
+/*    if(r == 1) {
         neoscrypt_blkxor(&X[0], &X[16], BLOCK_SIZE);
         if(mixer)
           neoscrypt_chacha(&X[0], rounds);
@@ -517,9 +628,9 @@ void neoscrypt_blkmix(uint *X, uint *Y, uint r, uint mixmode) {
         else
           neoscrypt_salsa(&X[16], rounds);
         return;
-    }
+    }*/
 
-    if(r == 2) {
+//    if(r == 2) {
         neoscrypt_blkxor(&X[0], &X[48], BLOCK_SIZE);
         if(mixer)
           neoscrypt_chacha(&X[0], rounds);
@@ -541,10 +652,10 @@ void neoscrypt_blkmix(uint *X, uint *Y, uint r, uint mixmode) {
         else
           neoscrypt_salsa(&X[48], rounds);
         neoscrypt_blkswp(&X[16], &X[32], BLOCK_SIZE);
-        return;
+/*        return;
     }
 
-    /* Reference code for any reasonable r */
+    * Reference code for any reasonable r *
     for(i = 0; i < 2 * r; i++) {
         if(i) neoscrypt_blkxor(&X[16 * i], &X[16 * (i - 1)], BLOCK_SIZE);
         else  neoscrypt_blkxor(&X[0], &X[16 * (2 * r - 1)], BLOCK_SIZE);
@@ -557,7 +668,7 @@ void neoscrypt_blkmix(uint *X, uint *Y, uint r, uint mixmode) {
     for(i = 0; i < r; i++)
       neoscrypt_blkcpy(&X[16 * i], &Y[16 * 2 * i], BLOCK_SIZE);
     for(i = 0; i < r; i++)
-      neoscrypt_blkcpy(&X[16 * (i + r)], &Y[16 * (2 * i + 1)], BLOCK_SIZE);
+      neoscrypt_blkcpy(&X[16 * (i + r)], &Y[16 * (2 * i + 1)], BLOCK_SIZE);*/
 }
 
 
@@ -597,83 +708,73 @@ void neoscrypt_blkmix(uint *X, uint *Y, uint r, uint mixmode) {
  *     11110 = N of 2147483648;
  *   profile bits 30 to 13 are reserved */
 __attribute__((reqd_work_group_size(WORKSIZE, 1, 1)))
-__kernel void search(__global const uint4 * restrict input,
-		volatile __global uint*restrict output,
-		__global uint4*restrict padcache,
-		const uint4 midstate0,
-		const uint4 midstate16,
+__kernel void search(__global const uint4* restrict input,
+		volatile __global uint* restrict output,
+		__global uchar* padcache,
+//		const uint4 midstate0,
+//		const uint4 midstate16,
 		const uint target)
 {
-	uint gid = get_global_id(0);
-//	uint4 X[8];
-//	uint4 tstate0, tstate1, ostate0, ostate1, tmp0, tmp1;
-	
-	uint4 data = (uint4)(input[4].x,input[4].y,input[4].z,gid);
-//	uint4 pad0 = midstate0, pad1 = midstate16;
-
 #define CONSTANT_N 128
 #define CONSTANT_r 2
 
-    uint /*CONSTANT_N = 128, CONSTANT_r = 2,*/ dblmix = 1, mixmode = 0x14/*, stack_align = 0x40*/;
+	/* Ensure stack alignment by putting those first. */
+	/* X = CONSTANT_r * 2 * BLOCK_SIZE(64)=  */
+	uchar X[256];
+	/* Z is a copy of X for ChaCha */
+	uchar Z[256];
+	/* V = CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE */
+	__global uchar *V= &padcache[CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE* get_global_id(0)];
+	uint4 data = (uint4)(input[4].x, input[4].y, input[4].z, get_global_id(0));
+
+    const uint mixmode = 0x14/*, stack_align = 0x40*/;
     uint i, j;
-    uint *X, *Y, *Z, *V;
-	//                                   64
-    //uchar stack[(CONSTANT_N + 3) * CONSTANT_r * 2 * BLOCK_SIZE + STACK_ALIGN];
-    /* X = r * 2 * BLOCK_SIZE */
-    X = (uint *) padcache; //(uint *) &stack[STACK_ALIGN & ~(STACK_ALIGN - 1)];
-    /* Z is a copy of X for ChaCha */
-    Z = &X[32 * CONSTANT_r];
-    /* Y is an X sized temporal space */
-    Y = &X[64 * CONSTANT_r];
-    /* V = N * CONSTANT_r * 2 * BLOCK_SIZE */
-    V = &X[96 * CONSTANT_r];
 
     /* X = KDF(password, salt) */
-	fastkdf(data, data, 32, (uchar *) X, CONSTANT_r * 2 * BLOCK_SIZE);
+	fastkdf(data, data, 32, X, CONSTANT_r * 2 * BLOCK_SIZE);
 
     /* Process ChaCha 1st, Salsa 2nd and XOR them into PBKDF2 */
-	/* blkcpy(Z, X) */
-	neoscrypt_blkcpy(&Z[0], &X[0], CONSTANT_r * 2 * BLOCK_SIZE);
+	neoscrypt_blkcpy(Z, X, CONSTANT_r * 2 * BLOCK_SIZE);
 
 	/* Z = SMix(Z) */
 	for(i = 0; i < CONSTANT_N; i++) {
 		/* blkcpy(V, Z) */
-		neoscrypt_blkcpy(&V[i * (32 * CONSTANT_r)], &Z[0], CONSTANT_r * 2 * BLOCK_SIZE);
+		neoscrypt_gl_blkcpy(&V[i * (32 * CONSTANT_r)], &Z[0], CONSTANT_r * 2 * BLOCK_SIZE);
 		/* blkmix(Z, Y) */
-		neoscrypt_blkmix(&Z[0], &Y[0], CONSTANT_r, (mixmode | 0x0100));
+		neoscrypt_blkmix((uint *)Z, /*&Y[0], CONSTANT_r,*/ (mixmode | 0x0100));
 	}
 	for(i = 0; i < CONSTANT_N; i++) {
 		/* integerify(Z) mod N */
 		j = (32 * CONSTANT_r) * (Z[16 * (2 * CONSTANT_r - 1)] & (CONSTANT_N - 1));
 		/* blkxor(Z, V) */
-		neoscrypt_blkxor(&Z[0], &V[j], CONSTANT_r * 2 * BLOCK_SIZE);
+		neoscrypt_gl_blkxor(&Z[0], &V[j], CONSTANT_r * 2 * BLOCK_SIZE);
 		/* blkmix(Z, Y) */
-		neoscrypt_blkmix(&Z[0], &Y[0], CONSTANT_r, (mixmode | 0x0100));
+		neoscrypt_blkmix((uint *)Z, /*&Y[0], CONSTANT_r, */(mixmode | 0x0100));
 	}
 
     /* X = SMix(X) */
     for(i = 0; i < CONSTANT_N; i++) {
         /* blkcpy(V, X) */
-        neoscrypt_blkcpy(&V[i * (32 * CONSTANT_r)], &X[0], CONSTANT_r * 2 * BLOCK_SIZE);
+        neoscrypt_gl_blkcpy(&V[i * (32 * CONSTANT_r)], &X[0], CONSTANT_r * 2 * BLOCK_SIZE);
         /* blkmix(X, Y) */
-        neoscrypt_blkmix(&X[0], &Y[0], CONSTANT_r, mixmode);
+        neoscrypt_blkmix((uint *)X, /*&Y[0], CONSTANT_r,*/ mixmode);
     }
     for(i = 0; i < CONSTANT_N; i++) {
         /* integerify(X) mod N */
         j = (32 * CONSTANT_r) * (X[16 * (2 * CONSTANT_r - 1)] & (CONSTANT_N - 1));
         /* blkxor(X, V) */
-        neoscrypt_blkxor(&X[0], &V[j], CONSTANT_r * 2 * BLOCK_SIZE);
+        neoscrypt_gl_blkxor(&X[0], &V[j], CONSTANT_r * 2 * BLOCK_SIZE);
         /* blkmix(X, Y) */
-        neoscrypt_blkmix(&X[0], &Y[0], CONSTANT_r, mixmode);
+        neoscrypt_blkmix((uint *)X, /*&Y[0], CONSTANT_r,*/ mixmode);
     }
 
 	/* blkxor(X, Z) */
 	neoscrypt_blkxor(&X[0], &Z[0], CONSTANT_r * 2 * BLOCK_SIZE);
 
-    /* output = KDF(password, X) ,   256                    , */
-    fastkdf(data, *((uint4 *)X), /*CONSTANT_r * 2 * BLOCK_SIZE,*/ 32, (uchar *)output, 32);
-		
-//	bool result = (EndianSwap(ostate1.w) <= target);
-//	if (result)
-		SETFOUND(gid);
+    /* output = KDF(password, X) */
+    fastkdf_ext_salt(data, X, 32, (__global uchar *)output, 32);
+
+	bool result = (EndianSwap(output[8]) <= target);
+	if (result)
+		SETFOUND(get_global_id(0));
 }
