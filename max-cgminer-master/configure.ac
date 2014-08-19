@@ -47,6 +47,11 @@ AM_MAINTAINER_MODE
 
 dnl Checks for programs
 AC_PROG_CC
+AC_PROG_CC_C99
+if test "x$ac_cv_prog_cc_c99" == xno; then
+	AC_MSG_ERROR([C99 compatible c compiler required])
+fi
+
 gl_EARLY
 AC_PROG_GCC_TRADITIONAL
 AM_PROG_CC_C_O
@@ -529,21 +534,21 @@ if test "x$opencl" != xno; then
 
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
-		if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike$neoscrypt" = xnononononononono; then
+		if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike" = xnonononononono; then
 			AC_MSG_ERROR([No mining configured in])
 		fi
 		echo "  scrypt...............: Disabled (needs OpenCL)"
 		echo "  keccak...............: Disabled (needs OpenCL)"
-dnl		echo "  neoscrypt............: Disabled (needs OpenCL)"
+		echo "  neoscrypt............: Disabled (needs OpenCL)"
 	fi
 else
 	echo "  OpenCL...............: Detection overrided. GPU mining support DISABLED"
-	if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike$neoscrypt" = xnononononononono; then
+	if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike" = xnonononononono; then
 		AC_MSG_ERROR([No mining configured in])
 	fi
 	echo "  scrypt...............: Disabled (needs OpenCL)"
 	echo "  keccak...............: Disabled (needs OpenCL)"
-dnl	echo "  neoscrypt............: Disabled (needs OpenCL)"
+	echo "  neoscrypt............: Disabled (needs OpenCL)"
 fi
 
 if test "x$adl" != xno; then
