@@ -333,6 +333,7 @@ else
 	AC_SEARCH_LIBS(addstr, ncurses pdcurses, [
 		curses=yes
 		cursesmsg="FOUND: ${ac_cv_search_addstr}"
+		CURSES_LIBS="${ac_cv_search_addstr}"
 		AC_DEFINE([HAVE_CURSES], [1], [Defined to 1 if curses TUI support is wanted])
 	], [
 		if test "x$curses" = "xyes"; then
@@ -471,8 +472,7 @@ AC_SUBST(JANSSON_LIBS)
 AC_SUBST(PTHREAD_FLAGS)
 AC_SUBST(DLOPEN_FLAGS)
 AC_SUBST(PTHREAD_LIBS)
-AC_SUBST(NCURSES_LIBS)
-AC_SUBST(PDCURSES_LIBS)
+AC_SUBST(CURSES_LIBS)
 AC_SUBST(WS2_LIBS)
 AC_SUBST(MM_LIBS)
 AC_SUBST(MATH_LIBS)
@@ -529,21 +529,21 @@ if test "x$opencl" != xno; then
 
 	else
 		echo "  OpenCL...............: NOT FOUND. GPU mining support DISABLED"
-		if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike" = xnonononononono; then
+		if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike$neoscrypt" = xnononononononono; then
 			AC_MSG_ERROR([No mining configured in])
 		fi
 		echo "  scrypt...............: Disabled (needs OpenCL)"
 		echo "  keccak...............: Disabled (needs OpenCL)"
-		echo "  neoscrypt............: Disabled (needs OpenCL)"
+dnl		echo "  neoscrypt............: Disabled (needs OpenCL)"
 	fi
 else
 	echo "  OpenCL...............: Detection overrided. GPU mining support DISABLED"
-	if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike" = xnonononononono; then
+	if test "x$avalon$bitforce$bitfury$icarus$modminer$bflsc$klondike$neoscrypt" = xnononononononono; then
 		AC_MSG_ERROR([No mining configured in])
 	fi
 	echo "  scrypt...............: Disabled (needs OpenCL)"
 	echo "  keccak...............: Disabled (needs OpenCL)"
-	echo "  neoscrypt............: Disabled (needs OpenCL)"
+dnl	echo "  neoscrypt............: Disabled (needs OpenCL)"
 fi
 
 if test "x$adl" != xno; then
@@ -604,7 +604,7 @@ echo "Compilation............: make (or gmake)"
 echo "  CPPFLAGS.............: $CPPFLAGS"
 echo "  CFLAGS...............: $CFLAGS"
 echo "  LDFLAGS..............: $LDFLAGS $PTHREAD_FLAGS"
-echo "  LDADD................: $DLOPEN_FLAGS $LIBCURL_LIBS $JANSSON_LIBS $PTHREAD_LIBS $OPENCL_LIBS $NCURSES_LIBS $PDCURSES_LIBS $WS2_LIBS $MATH_LIBS $LIBUSB_LIBS $RT_LIBS"
+echo "  LDADD................: $DLOPEN_FLAGS $LIBCURL_LIBS $JANSSON_LIBS $PTHREAD_LIBS $OPENCL_LIBS $CURSES_LIBS $WS2_LIBS $MATH_LIBS $LIBUSB_LIBS $RT_LIBS"
 echo
 echo "Installation...........: make install (as root if needed, with 'su' or 'sudo')"
 echo "  prefix...............: $prefix"

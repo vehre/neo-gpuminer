@@ -1372,7 +1372,7 @@ static struct opt_table opt_config_table[] = {
 			opt_set_bool, &opt_neoscrypt,
 			"Use then neoscrypt algorithm for mining (feathercoin only)"),
 #endif
-#if defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)
+#if (defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)) && defined(HAVE_OPENCL)
 	OPT_WITH_ARG("--shaders",
 		     set_shaders, NULL, NULL,
 		     "GPU shaders per card for tuning scrypt, comma separated"),
@@ -1420,7 +1420,7 @@ static struct opt_table opt_config_table[] = {
 			opt_hidden
 #endif
 	),
-#if defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)
+#if (defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)) && defined(HAVE_OPENCL)
 	OPT_WITH_ARG("--thread-concurrency",
 		     set_thread_concurrency, NULL, NULL,
 		     "Set GPU thread concurrency for scrypt mining, comma separated"),
@@ -2285,9 +2285,11 @@ static void curses_print_status(void)
 	struct pool *pool = current_pool();
 
 	wattron(statuswin, A_BOLD);
+#ifdef USE_NEOSCRYPT
 	if (opt_neoscrypt) 
 		cg_mvwprintw(statuswin, 0, 0, " " PACKAGE " version " VERSION " - Feathercoin Neoscrypt - Started: %s", datestamp);
 	else
+#endif
 		cg_mvwprintw(statuswin, 0, 0, " " PACKAGE " version " VERSION " - Started: %s", datestamp);
 	wattroff(statuswin, A_BOLD);
 	mvwhline(statuswin, 1, 0, '-', 80);
@@ -2736,10 +2738,6 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 
 	cgpu = get_thr_cgpu(thr_id);
 
-#ifdef USE_NEOSCRYPT
-	/* On neoscrypt everything is little endian. */
-	if(!opt_neoscrypt)
-#endif
 	endian_flip128(work->data, work->data);
 
 	/* build hex string */

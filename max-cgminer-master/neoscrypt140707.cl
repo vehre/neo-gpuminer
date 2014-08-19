@@ -11,6 +11,8 @@ __constant uint ES[2] = { 0x00FF00FF, 0xFF00FF00 };
 
 #define BLOCK_SIZE 64U
 
+#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
+
 /* Salsa20, rounds must be a multiple of 2 */
 void neoscrypt_salsa(uint *X, uint rounds) {
     uint x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, t;
