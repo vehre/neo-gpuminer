@@ -469,6 +469,7 @@ struct cgpu_info *get_devices(int id)
 	return cgpu;
 }
 
+/** Log the shared data to a file. */
 static void sharelog(const char*disposition, const struct work*work)
 {
 	char *target, *hash, *data;
@@ -1693,6 +1694,7 @@ static struct opt_table opt_cmdline_table[] = {
 };
 
 #ifdef HAVE_LIBCURL
+/** Get the binary data of field key from the json message. */
 static bool jobj_binary(const json_t *obj, const char *key,
 			void *buf, size_t buflen, bool required)
 {
@@ -2051,7 +2053,7 @@ static bool getwork_decode(json_t *res_val, struct work *work)
 	}
 
 	if (unlikely(!jobj_binary(res_val, "target", work->target, sizeof(work->target), true))) {
-		applog(LOG_ERR, "JSON inval target");
+		applog(LOG_ERR, "JSON invalid target");
 		return false;
 	}
 	return true;
@@ -2408,9 +2410,7 @@ static void curses_print_devstatus(struct cgpu_info *cgpu, int count)
 
 	wclrtoeol(statuswin);
 }
-#endif
 
-#ifdef HAVE_CURSES
 /* Check for window resize. Called with curses mutex locked */
 static inline void change_logwinsize(void)
 {

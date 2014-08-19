@@ -11,8 +11,6 @@ __constant uint ES[2] = { 0x00FF00FF, 0xFF00FF00 };
 
 #define BLOCK_SIZE 64U
 
-#pragma OPENCL EXTENSION cl_khr_byte_addressable_store : enable
-
 /* Salsa20, rounds must be a multiple of 2 */
 void neoscrypt_salsa(uint *X, uint rounds) {
     uint x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, t;
@@ -175,12 +173,20 @@ void neoscrypt_copy(void *dstp, const void *srcp, uint len) {
 
     tail = len & (sizeof(OPTIMAL_TYPE) - 1);
     if(tail) {
-        uchar *dstb = (uchar *) dstp;
+#if defined(cl_khr_byte_addressable_store) && !defined(FORCE_BYTE_COPY)
+		uchar *dstb = (uchar *) dstp;
         uchar *srcb = (uchar *) srcp;
 
         for(i = len - tail; i < len; i++)
           dstb[i] = srcb[i];
-    }
+#else
+		uint *dsti = (uint *) dstp;
+		uint *srci = (uint *) srcp;
+
+		for(i*= sizeof(OPTIMAL_TYPE)/ sizeof(uint); i < (len>> 2); ++i)
+		  dsti[i] = srci[i];
+#endif
+	}
 }
 
 /* 32-bit / 64-bit / 128-bit optimised memcpy() */
@@ -212,10 +218,17 @@ void neoscrypt_erase(void *dstp, uint len) {
 
     tail = len & (sizeof(OPTIMAL_TYPE) - 1);
     if(tail) {
+#if defined(cl_khr_byte_addressable_store) && !defined(FORCE_BYTE_COPY)
         uchar *dstb = (uchar *) dstp;
 
         for(i = len - tail; i < len; i++)
 			dstb[i] = 0u;
+#else
+		uint *dsti = (uint *) dstp;
+
+		for(i*= sizeof(OPTIMAL_TYPE)/ sizeof(uint); i< (len>> 2); ++i)
+			dsti[i] = 0u;
+#endif
     }
 }
 
@@ -230,11 +243,19 @@ void neoscrypt_xor(void *dstp, const void *srcp, uint len) {
 
     tail = len & (sizeof(OPTIMAL_TYPE) - 1);
     if(tail) {
+#if defined(cl_khr_byte_addressable_store) && !defined(FORCE_BYTE_COPY)
         uchar *dstb = (uchar *) dstp;
         uchar *srcb = (uchar *) srcp;
 
         for(i = len - tail; i < len; i++)
           dstb[i] ^= srcb[i];
+#else
+		uint *dsti = (uint *) dstp;
+		uint *srci = (uint *) srcp;
+
+		for(i*= sizeof(OPTIMAL_TYPE)/ sizeof(uint); i < (len>> 2); ++i)
+			dsti[i]^= srci[i];
+#endif
     }
 }
 
@@ -513,7 +534,7 @@ void fastkdf(const uint4 password, const uint4 salt,
  * password_len, salt_len and output_len should not exceed FASTKDF_BUFFER_SIZE;
  * prf_output_size must be <= prf_key_size; */
 void fastkdf_ext_salt(const uint4 password, const uchar *salt,
-			 uint N, __global uchar *output, uint output_len) {
+			 uint N, uchar *output, uint output_len) {
 
 	// BLOCK_SIZE            64U
 	// FASTKDF_BUFFER_SIZE  256U
@@ -593,12 +614,12 @@ void fastkdf_ext_salt(const uint4 password, const uchar *salt,
     a = FASTKDF_BUFFER_SIZE - bufidx;
     if(a >= output_len) {
         neoscrypt_xor(&ucBptr[bufidx], ucAptr, output_len);
-        neoscrypt_gl_copy(output, &ucBptr[bufidx], output_len);
+        neoscrypt_copy(output, &ucBptr[bufidx], output_len);
     } else {
         neoscrypt_xor(&ucBptr[bufidx], ucAptr, a);
         neoscrypt_xor(ucBptr, &ucAptr[a], output_len - a);
-        neoscrypt_gl_copy(output, &ucBptr[bufidx], a);
-        neoscrypt_gl_copy(&output[a], ucBptr, output_len - a);
+        neoscrypt_copy(output, &ucBptr[bufidx], a);
+        neoscrypt_copy(&output[a], ucBptr, output_len - a);
     }
 }
 
@@ -728,6 +749,7 @@ __kernel void search(__global const uint4* restrict input,
 	/* V = CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE */
 	__global uchar *V= &padcache[CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE*
 		(get_global_id(0)% CONCURRENT_THREADS)];
+	uchar outbuf[32];
 	uint4 data = (uint4)(input[4].x, input[4].y, input[4].z, get_global_id(0));
 
     const uint mixmode = 0x14/*, stack_align = 0x40*/;
@@ -775,7 +797,7 @@ __kernel void search(__global const uint4* restrict input,
 	neoscrypt_blkxor(&X[0], &Z[0], CONSTANT_r * 2 * BLOCK_SIZE);
 
     /* output = KDF(password, X) */
-    fastkdf_ext_salt(data, X, 32, (__global uchar *)output, 32);
+    fastkdf_ext_salt(data, X, 32, outbuf, 32);
 
 	bool result = (EndianSwap(output[8]) <= target);
 	if (result)
