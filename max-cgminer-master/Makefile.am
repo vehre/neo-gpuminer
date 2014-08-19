@@ -26,7 +26,7 @@ bin_SCRIPTS	= $(top_srcdir)/*.cl
 
 cgminer_LDFLAGS	= $(PTHREAD_FLAGS)
 cgminer_LDADD	= $(DLOPEN_FLAGS) @LIBCURL_LIBS@ @JANSSON_LIBS@ @PTHREAD_LIBS@ \
-		  @OPENCL_LIBS@ @NCURSES_LIBS@ @PDCURSES_LIBS@ @WS2_LIBS@ \
+		  @OPENCL_LIBS@ @CURSES_LIBS@ @WS2_LIBS@ \
 		  @LIBUSB_LIBS@ @MM_LIBS@ @RT_LIBS@ \
 		  @MATH_LIBS@ lib/libgnu.a ccan/libccan.a
 
@@ -54,15 +54,13 @@ cgminer_SOURCES += driver-opencl.h driver-opencl.c
 # the original GPU related sources, unchanged
 cgminer_SOURCES += ocl.c ocl.h findnonce.c findnonce.h
 cgminer_SOURCES += adl.c adl.h adl_functions.h
-cgminer_SOURCES += *.cl
+#cgminer_SOURCES += *.cl
 
 if HAS_SCRYPT
 cgminer_SOURCES += scrypt.c scrypt.h
 endif
 
-if HAS_NEOSCRYPT
 cgminer_SOURCES += neoscrypt.c neoscrypt.h
-endif
 
 if HAS_KECCAK
 cgminer_SOURCES += keccak.c keccak.h
