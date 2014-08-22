@@ -963,7 +963,6 @@ static void neoscrypt_blake2s(const void *input, const uint input_size, const vo
     S->f[0] = ~0U;
     neoscrypt_erase(S->buf + S->buflen, 2 * BLAKE2S_BLOCK_SIZE - S->buflen);
     blake2s_compress(S, (uint *) S->buf);
-
     /* Write back */
     neoscrypt_copy(output, S, output_size);
 }
@@ -979,7 +978,8 @@ static void neoscrypt_fastkdf(const uchar *password, uint password_len,
 							  const uchar *salt, uint salt_len,
 							  uint N, uchar *output, uint output_len) {
     const uint stack_align = 0x40, kdf_buf_size = FASTKDF_BUFFER_SIZE,
-      prf_input_size = BLAKE2S_BLOCK_SIZE, prf_key_size = BLAKE2S_KEY_SIZE, prf_output_size = BLAKE2S_OUT_SIZE;
+			prf_input_size = BLAKE2S_BLOCK_SIZE, prf_key_size = BLAKE2S_KEY_SIZE,
+			prf_output_size = BLAKE2S_OUT_SIZE;
     uint bufptr, a, b, i, j;
     uchar *A, *B, *prf_input, *prf_key, *prf_output;
 
@@ -1029,7 +1029,6 @@ static void neoscrypt_fastkdf(const uchar *password, uint password_len,
         for(j = 0, bufptr = 0; j < prf_output_size; j++)
           bufptr += prf_output[j];
         bufptr &= (kdf_buf_size - 1);
-
         /* Modify the salt buffer */
         neoscrypt_xor(&B[bufptr], &prf_output[0], prf_output_size);
 
@@ -1040,7 +1039,6 @@ static void neoscrypt_fastkdf(const uchar *password, uint password_len,
         /* Tail modified, head updated */
         if((kdf_buf_size - bufptr) < prf_output_size)
           neoscrypt_copy(&B[0], &B[kdf_buf_size], prf_output_size - (kdf_buf_size - bufptr));
-
     }
 
     /* Modify and copy into the output buffer */
@@ -1289,18 +1287,9 @@ void neoscrypt(const uchar *password, uchar *output, uint profile) {
 
 }
 
-/* 131583 rounded up to 4 byte alignment */
-#define SCRATCHBUF_SIZE	(131584)
-
 void neoscrypt_regenhash(struct work *work)
 {
-	uchar output[32];
-
-	//be32enc_vect(data, (const uint32_t *)work->data, 19);
-	//data[19] = htobe32(*nonce);
-	//scratchbuf = alloca(SCRATCHBUF_SIZE);
-	neoscrypt(work->data, output, 0x80000620);
-	//flip32(ohash, ohash);
+	neoscrypt(work->data, work->hash, 0x80000620);
 }
 
 #if (NEOSCRYPT_TEST)

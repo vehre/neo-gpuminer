@@ -468,7 +468,7 @@ AC_DEFINE_UNQUOTED([DIAKGCN_KERNNAME], ["diakgcn121016"], [Filename for diakgcn 
 AC_DEFINE_UNQUOTED([DIABLO_KERNNAME], ["diablo130302"], [Filename for diablo kernel])
 AC_DEFINE_UNQUOTED([SCRYPT_KERNNAME], ["scrypt130511"], [Filename for scrypt kernel])
 AC_DEFINE_UNQUOTED([KECCAK_KERNNAME], ["keccak130718"], [Filename for keccak kernel])
-AC_DEFINE_UNQUOTED([NEOSCRYPT_KERNNAME], ["neoscrypt140707"], [Filename for neoscrypt kernel])
+AC_DEFINE_UNQUOTED([NEOSCRYPT_KERNNAME], ["neoscrypt140822"], [Filename for neoscrypt kernel])
 
 
 AC_SUBST(OPENCL_LIBS)

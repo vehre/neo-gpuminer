@@ -327,11 +327,12 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 	/* Check for BFI INT support. Hopefully people don't mix devices with
 	 * and without it! */
-	char * extensions = malloc(1024);
+	char * extensions = malloc(2048);
 	const char * camo = "cl_amd_media_ops";
 	char *find;
+	bool hasPrintf= false;
 
-	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_EXTENSIONS, 1024, (void *)extensions, NULL);
+	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_EXTENSIONS, 2048, (void *)extensions, NULL);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Failed to clGetDeviceInfo when trying to get CL_DEVICE_EXTENSIONS", status);
 		return NULL;
@@ -339,6 +340,11 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	find = strstr(extensions, camo);
 	if (find)
 		clState->hasBitAlign = true;
+	find = strstr(extensions, "printf");
+	if (find) {
+		hasPrintf= true;
+		applog(LOG_DEBUG, "GPU %d has printf_debug extension.", gpu);
+	}
 		
 	/* Check for OpenCL >= 1.0 support, needed for global offset parameter usage. */
 	char *devoclver= malloc(1024);
@@ -640,8 +646,8 @@ build:
 #endif
 #if defined(USE_NEOSCRYPT)
 	if (opt_neoscrypt)
-		sprintf(CompilerOptions, "-D CONCURRENT_THREADS=%d -D WORKSIZE=%d",
-			(unsigned int)cgpu->thread_concurrency, (int)clState->wsize);
+		sprintf(CompilerOptions, "-D CONCURRENT_THREADS=%d -D WORKGROUPSIZE=%d %s",
+			(unsigned int)cgpu->thread_concurrency, (int)clState->wsize, (hasPrintf? "-g": ""));
 	else
 #endif
 	{
@@ -899,7 +905,7 @@ built:
 			applog(LOG_ERR, "Error %d: clCreateBuffer (CLbuffer0)", status);
 			return NULL;
 		}
-		applog(LOG_DEBUG, "Creating neoscrypt output buffer sized %d", SCRYPT_BUFFERSIZE);
+		applog(LOG_DEBUG, "Creating neoscrypt output buffer sized %lu", SCRYPT_BUFFERSIZE);
 		clState->outputBuffer = clCreateBuffer(clState->context, CL_MEM_WRITE_ONLY, SCRYPT_BUFFERSIZE, NULL, &status);
 	} else
 #endif

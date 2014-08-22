@@ -5186,7 +5186,7 @@ static void hashmeter(int thr_id, struct timeval *diff,
 
 	local_secs = (double)total_diff.tv_sec + ((double)total_diff.tv_usec / 1000000.0);
 	decay_time(&total_rolling, local_mhashes_done / local_secs, local_secs);
-	global_hashrate = roundl(total_rolling) * 1000000;
+	global_hashrate = llroundl(total_rolling) * 1000000;
 
 	timersub(&total_tv_end, &total_tv_start, &total_diff);
 	total_secs = (double)total_diff.tv_sec +
@@ -5608,7 +5608,12 @@ static void *stratum_sthread(void *userdata)
 		sshare->sshare_time = time(NULL);
 		/* This work item is freed in parse_stratum_response */
 		sshare->work = work;
-		nonce = *((uint32_t *)(work->data + 76));
+#ifdef USE_NEOSCRYPT
+		if(opt_neoscrypt)
+			nonce= htobe32(*((uint32_t *)(work->data + 76)));
+		else
+#endif
+			nonce = *((uint32_t *)(work->data + 76));
 		__bin2hex(noncehex, (const unsigned char *)&nonce, 4);
 		memset(s, 0, 1024);
 
@@ -5628,6 +5633,8 @@ static void *stratum_sthread(void *userdata)
 
 		applog(LOG_INFO, "Submitting share %08lx to pool %d",
 					(long unsigned int)htole32(hash32[6]), pool->pool_no);
+
+		applog(LOG_DEBUG, "Submitting content: %s", s);
 
 		/* Try resubmitting for up to 2 minutes if we fail to submit
 		 * once and the stratum pool nonce1 still matches suggesting
@@ -5991,11 +5998,6 @@ void set_target(unsigned char *dest_target, double diff)
 			data64 = (uint64_t *)(rtarget + 2);
 		else
 #endif
-#ifdef USE_NEOSCRYPT
-		if (opt_neoscrypt)
-			data64 = (uint64_t *)(rtarget + 2);
-	    else
-#endif
 		if (opt_keccak)
 			data64 = (uint64_t *)(rtarget + 3);
 		else
@@ -6008,11 +6010,6 @@ void set_target(unsigned char *dest_target, double diff)
 		if (opt_scrypt)
 			memset(target, 0xff, 30);
 		else
-#endif
-#ifdef USE_NEOSCRYPT
-		if (opt_neoscrypt)
-			memset(target, 0xff, 30);
-        else
 #endif
 		if (opt_keccak)
             memset(target, 0xff, 29);
@@ -6028,6 +6025,32 @@ void set_target(unsigned char *dest_target, double diff)
 	}
 	memcpy(dest_target, target, 32);
 }
+
+#ifdef USE_NEOSCRYPT
+void set_target_neoscrypt(unsigned char *target, double diff)
+{
+	uint64_t m;
+	int k;
+
+	diff /=	65536.0;
+	for (k = 6; k > 0 && diff > 1.0; k--)
+		diff /= 4294967296.0;
+	m = 4294901760.0 / diff;
+	if (m == 0 && k == 6)
+		memset(target, 0xff, 32);
+	else {
+		memset(target, 0, 32);
+		((uint32_t *)target)[k] = (uint32_t)m;
+		((uint32_t *)target)[k + 1] = (uint32_t)(m >> 32);
+	}
+	if (opt_debug) {
+		char *htarget = bin2hex(target, 32);
+
+		applog(LOG_DEBUG, "Generated neoscrypt target %sx0", htarget);
+		free(htarget);
+	}
+}
+#endif
 
 /* Generates stratum based work based on the most recent notify information
  * from the pool. This will keep generating work while a pool is down so we use
@@ -6049,23 +6072,40 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
 	cg_dwlock(&pool->data_lock);
 
 	/* Generate merkle root */
-    if (opt_keccak) {
+    if (opt_keccak)
         sha256(pool->coinbase, pool->swork.cb_len, merkle_root);
-    } else {
+	else
 	    gen_hash(pool->coinbase, merkle_root, pool->swork.cb_len);
-	}
+
 	memcpy(merkle_sha, merkle_root, 32);
 	for (i = 0; i < pool->swork.merkles; i++) {
 		memcpy(merkle_sha + 32, pool->swork.merkle_bin[i], 32);
 		gen_hash(merkle_sha, merkle_root, 64);
 		memcpy(merkle_sha, merkle_root, 32);
 	}
+
 	data32 = (uint32_t *)merkle_sha;
 	swap32 = (uint32_t *)merkle_root;
-	flip32(swap32, data32);
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt) {
+		/* Incoming data is in little endian. */
+		memcpy(merkle_root, merkle_sha, 32);
+	} else
+#endif
+		flip32(swap32, data32);
 
 	/* Copy the data template from header_bin */
-	memcpy(work->data, pool->header_bin, 128);
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt) {
+		uint32_t temp;
+		flip32(work->data, pool->header_bin);
+		hex2bin((unsigned char *)&temp, pool->swork.ntime, 4);
+		((uint32_t *)work->data)[17]= be32toh(temp);
+		hex2bin((unsigned char *)&temp, pool->swork.nbit, 4);
+		((uint32_t *)work->data)[18]= be32toh(temp);
+	} else
+#endif
+		memcpy(work->data, pool->header_bin, 128);
 	memcpy(work->data + pool->merkle_offset, merkle_root, 32);
 
 	/* Store the stratum work diff to check it still matches the pool's
@@ -6090,8 +6130,16 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
 		free(merkle_hash);
 	}
 
-	calc_midstate(work);
-	set_target(work->target, work->sdiff);
+#ifdef USE_NEOSCRYPT
+	if(!opt_neoscrypt)
+#endif
+		calc_midstate(work);
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt)
+		set_target_neoscrypt(work->target, work->sdiff);
+	else
+#endif
+		set_target(work->target, work->sdiff);
 
 	local_work++;
 	work->pool = pool;
@@ -6195,19 +6243,23 @@ bool test_nonce(struct work *work, uint32_t nonce)
 
 	/* Do one last check before attempting to submit the work */
 	rebuild_hash(work);
-	flip32(hash2_32, work->hash);
 
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt) {
+		diff1targ= ((uint32_t *)work->target)[7];
+		memcpy(work->hash2, work->hash, 8* sizeof(uint32_t));
+		return hash2_32[7]<= diff1targ;
+	} else
+#endif
 #ifdef USE_SCRYPT
 	if(opt_scrypt)
 		diff1targ= 0x0000ffffUL;
-	else
-#endif
-#ifdef USE_NEOSCRYPT
-	if(opt_neoscrypt)
-		diff1targ= 0x0000ffffUL;
-	else
+	 else
 #endif
 		diff1targ= opt_keccak ? 0x000000ffUL : 0;
+
+	flip32(hash2_32, work->hash);
+
 	return (be32toh(hash2_32[7]) <= diff1targ);
 }
 
@@ -6375,7 +6427,7 @@ static void hash_sole_work(struct thr_info *mythr)
 				work->device_diff = MIN(drv->working_diff, work->work_difficulty);
 			} else if (drv->working_diff > work->work_difficulty)
 				drv->working_diff = work->work_difficulty;
-			set_target(work->device_target, work->device_diff);
+			set_target_neoscrypt(work->device_target, work->device_diff);
 		}
 #endif
 

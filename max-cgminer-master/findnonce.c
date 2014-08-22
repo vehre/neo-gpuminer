@@ -198,8 +198,14 @@ static void *postcalc_hash(void *userdata)
 		pcd->res[found] &= found;
 	}
 
+	uint32_t nonce;
 	for (entry = 0; entry < pcd->res[found]; entry++) {
-		uint32_t nonce = swab32(pcd->res[entry]);
+#ifdef USE_NEOSCRYPT
+		if(opt_neoscrypt)
+			nonce= pcd->res[entry];
+		else
+#endif
+			nonce = swab32(pcd->res[entry]);
 
 		applog(LOG_DEBUG, "OCL NONCE %u found in slot %d", nonce, entry);
 		submit_nonce(thr, pcd->work, nonce);

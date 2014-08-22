@@ -584,7 +584,7 @@ char *get_proxy(char *url, struct pool *pool)
 	return url;
 }
 
-void bin_reverse(unsigned char *in, unsigned char *out, int length)
+void bin_reverse(const unsigned char *in, unsigned char *out, int length)
 {
 	in += length - 1;
 	while(length-- > 0) {
@@ -597,9 +597,10 @@ void bin_reverse(unsigned char *in, unsigned char *out, int length)
 void __bin2hex(char *s, const unsigned char *p, size_t len)
 {
 	int i;
+	char *it= s;
 
-	for (i = 0; i < (int)len; i++)
-		sprintf(s + (i * 2), "%02x", (unsigned int)p[i]);
+	for (i = 0; i < (int)len; ++i, it+= 2)
+		sprintf(it, "%02x", (unsigned int)p[i]);
 
 }
 
@@ -661,19 +662,27 @@ bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
 bool fulltest(const unsigned char *hash, const unsigned char *target)
 {
 	unsigned char hash_swap[32], target_swap[32];
-	uint32_t *hash32 = (uint32_t *) hash_swap;
-	uint32_t *target32 = (uint32_t *) target_swap;
 	char *hash_str, *target_str;
 	bool rc = true;
 	int i;
 
+	uint32_t *hash32 = (uint32_t *) hash_swap;
+	uint32_t *target32 = (uint32_t *) target_swap;
 	swap256(hash_swap, hash);
 	swap256(target_swap, target);
+	uint32_t h32tmp, t32tmp;
 
 	for (i = 0; i < 32/4; i++) {
-		uint32_t h32tmp = htobe32(hash32[i]);
-		uint32_t t32tmp = htole32(target32[i]);
-
+#ifdef USE_NEOSCRYPT
+		if(opt_neoscrypt) {
+			h32tmp = htole32(hash32[i]);
+			t32tmp = htobe32(target32[i]);
+		} else
+#endif
+		{
+			h32tmp = htobe32(hash32[i]);
+			t32tmp = htole32(target32[i]);
+		}
 		target32[i] = swab32(target32[i]);	/* for printing */
 
 		if (h32tmp > t32tmp) {
@@ -685,12 +694,11 @@ bool fulltest(const unsigned char *hash, const unsigned char *target)
 			break;
 		}
 	}
-
-	if (opt_debug) {
+	if(opt_debug) {
 		hash_str = bin2hex(hash_swap, 32);
 		target_str = bin2hex(target_swap, 32);
 
-		applog(LOG_DEBUG, " Proof: %s\nTarget: %s\nTrgVal? %s",
+		applog(LOG_DEBUG, " Proof: %sx0\nTarget: %sx0\nTrgVal? %s",
 			hash_str,
 			target_str,
 			rc ? "YES (hash <= target)" :
