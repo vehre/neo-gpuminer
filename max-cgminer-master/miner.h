@@ -529,10 +529,12 @@ struct cgpu_info {
 	enum cl_kernels kernel;
 	cl_ulong max_alloc;
 
-#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
+#ifdef USE_SCRYPT
 	int opt_lg, lookup_gap;
-	size_t opt_tc, thread_concurrency;
 	size_t shaders;
+#endif
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
+	size_t opt_tc, thread_concurrency;
 #endif
 	struct timeval tv_gpustart;
 	int intervals;

@@ -18,9 +18,11 @@ extern char *set_temp_target(char *arg);
 extern char *set_intensity(char *arg);
 extern char *set_vector(char *arg);
 extern char *set_worksize(char *arg);
-#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
+#ifdef USE_SCRYPT
 extern char *set_shaders(char *arg);
 extern char *set_lookup_gap(char *arg);
+#endif
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 extern char *set_thread_concurrency(char *arg);
 #endif
 extern char *set_kernel(char *arg);

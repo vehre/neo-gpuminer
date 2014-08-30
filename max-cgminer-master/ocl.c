@@ -33,6 +33,9 @@
 
 #include "findnonce.h"
 #include "ocl.h"
+#ifdef USE_NEOSCRYPT
+#include "neoscrypt.h"
+#endif
 
 int opt_platform_id = -1;
 int opt_all_cldevices= 0; // when set to one, all cl devices (not only GPUs) will be available
@@ -341,7 +344,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	if (find)
 		clState->hasBitAlign = true;
 	find = strstr(extensions, "printf");
-	if (find) {
+	if (find&& opt_debug) {
 		hasPrintf= true;
 		applog(LOG_DEBUG, "GPU %d has printf_debug extension.", gpu);
 	}
@@ -509,8 +512,8 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		clState->wsize = (clState->max_work_size <= 256 ? clState->max_work_size : 256) / clState->vwidth;
 	cgpu->work_size = clState->wsize;
 
-#if defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)
-	if (opt_scrypt|| opt_neoscrypt) {
+#ifdef USE_SCRYPT
+	if (opt_scrypt) {
 		if (!cgpu->opt_lg) {
 			applog(LOG_DEBUG, "GPU %d: selecting lookup gap of 2", gpu);
 			cgpu->lookup_gap = 2;
@@ -527,6 +530,18 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 				if (cgpu->thread_concurrency > cgpu->shaders * 5)
 					cgpu->thread_concurrency = cgpu->shaders * 5;
 			}
+			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d", gpu, (int)(cgpu->thread_concurrency));
+		} else
+			cgpu->thread_concurrency = cgpu->opt_tc;
+	}
+#endif
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt){
+		if (!cgpu->opt_tc) {
+			unsigned int sixtyfours;
+
+			sixtyfours = cgpu->max_alloc / (NEOSCRYPT_SCRATCHBUF_SIZE* 2) / 64 - 1;
+			cgpu->thread_concurrency = sixtyfours * 64;
 			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d", gpu, (int)(cgpu->thread_concurrency));
 		} else
 			cgpu->thread_concurrency = cgpu->opt_tc;
@@ -877,8 +892,8 @@ built:
 
 #ifdef USE_NEOSCRYPT
 	if (opt_neoscrypt) {
-		size_t ipt = (1024 / cgpu->lookup_gap + (1024 % cgpu->lookup_gap > 0));
-		size_t bufsize = 128 * ipt * cgpu->thread_concurrency;
+		/* The scratch/pad-buffer needs 32kBytes memory per thread. */
+		size_t bufsize = NEOSCRYPT_SCRATCHBUF_SIZE * cgpu->thread_concurrency;
 
 		/* Use the max alloc value which has been rounded to a power of
 		 * 2 greater >= required amount earlier */

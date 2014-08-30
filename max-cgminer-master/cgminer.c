@@ -1204,6 +1204,8 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--lookup-gap",
 		     set_lookup_gap, NULL, NULL,
 		     "Set GPU lookup gap for scrypt mining, comma separated"),
+#endif
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 	OPT_WITH_ARG("--intensity|-I",
 		     set_intensity, NULL, NULL,
 		     "Intensity of GPU scanning (d or " MIN_SHA_INTENSITY_STR
@@ -1288,6 +1290,11 @@ static struct opt_table opt_config_table[] = {
 		     opt_set_charp, NULL, &opt_stderr_cmd,
 		     "Use custom pipe cmd for output messages"),
 #endif // defined(unix)
+#ifdef USE_NEOSCRYPT
+	OPT_WITHOUT_ARG("--neoscrypt",
+			opt_set_bool, &opt_neoscrypt,
+			"Use then neoscrypt algorithm for mining (feathercoin only)"),
+#endif
 	OPT_WITHOUT_ARG("--net-delay",
 			opt_set_bool, &opt_delaynet,
 			"Impose small delays in networking to not overload slow routers"),
@@ -1368,12 +1375,7 @@ static struct opt_table opt_config_table[] = {
 			opt_set_bool, &opt_scrypt,
 			"Use the scrypt algorithm for mining (litecoin only)"),
 #endif
-#ifdef USE_NEOSCRYPT
-	OPT_WITHOUT_ARG("--neoscrypt",
-			opt_set_bool, &opt_neoscrypt,
-			"Use then neoscrypt algorithm for mining (feathercoin only)"),
-#endif
-#if (defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)) && defined(HAVE_OPENCL)
+#if defined(USE_SCRYPT) && defined(HAVE_OPENCL)
 	OPT_WITH_ARG("--shaders",
 		     set_shaders, NULL, NULL,
 		     "GPU shaders per card for tuning scrypt, comma separated"),
@@ -1424,7 +1426,7 @@ static struct opt_table opt_config_table[] = {
 #if (defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)) && defined(HAVE_OPENCL)
 	OPT_WITH_ARG("--thread-concurrency",
 		     set_thread_concurrency, NULL, NULL,
-		     "Set GPU thread concurrency for scrypt mining, comma separated"),
+		     "Set GPU thread concurrency for (neo)scrypt mining, comma separated"),
 #endif
 	OPT_WITH_ARG("--url|-o",
 		     set_url, NULL, NULL,
@@ -4452,14 +4454,16 @@ void write_config(FILE *fcfg)
 		for(i = 0; i < nDevs; i++)
 			fprintf(fcfg, "%s%d", i > 0 ? "," : "",
 				(int)gpus[i].opt_lg);
-		fputs("\",\n\"thread-concurrency\" : \"", fcfg);
-		for(i = 0; i < nDevs; i++)
-			fprintf(fcfg, "%s%d", i > 0 ? "," : "",
-				(int)gpus[i].opt_tc);
 		fputs("\",\n\"shaders\" : \"", fcfg);
 		for(i = 0; i < nDevs; i++)
 			fprintf(fcfg, "%s%d", i > 0 ? "," : "",
 				(int)gpus[i].shaders);
+#endif
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
+		fputs("\",\n\"thread-concurrency\" : \"", fcfg);
+		for(i = 0; i < nDevs; i++)
+			fprintf(fcfg, "%s%d", i > 0 ? "," : "",
+				(int)gpus[i].opt_tc);
 #endif
 #ifdef HAVE_ADL
 		fputs("\",\n\"gpu-engine\" : \"", fcfg);

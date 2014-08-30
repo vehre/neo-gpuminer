@@ -124,7 +124,7 @@ char *set_worksize(char *arg)
 	return NULL;
 }
 
-#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
+#ifdef USE_SCRYPT
 char *set_shaders(char *arg)
 {
 	int i, val = 0, device = 0;
@@ -160,21 +160,33 @@ char *set_lookup_gap(char *arg)
 		return "Invalid parameters for set lookup gap";
 	val = atoi(nextptr);
 
-	gpus[device++].opt_lg = val;
-
-	while ((nextptr = strtok(NULL, ",")) != NULL) {
-		val = atoi(nextptr);
-
+#ifdef USE_NEOSCRYPT
+	/* Although in neoscrypt this option is not available currently,
+	 * better be on the safe side and check for it. */
+	if(opt_neoscrypt) {
+		if(val> 0) {
+			return "Neoscrypt does not support lookup gap";
+		}
+	} else
+#endif
+	{
 		gpus[device++].opt_lg = val;
-	}
-	if (device == 1) {
-		for (i = device; i < MAX_GPUDEVICES; i++)
-			gpus[i].opt_lg = gpus[0].opt_lg;
-	}
 
+		while ((nextptr = strtok(NULL, ",")) != NULL) {
+			val = atoi(nextptr);
+
+			gpus[device++].opt_lg = val;
+		}
+		if (device == 1) {
+			for (i = device; i < MAX_GPUDEVICES; i++)
+				gpus[i].opt_lg = gpus[0].opt_lg;
+		}
+	}
 	return NULL;
 }
+#endif
 
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 char *set_thread_concurrency(char *arg)
 {
 	int i, val = 0, device = 0;
@@ -1157,7 +1169,6 @@ static void set_threads_hashes(unsigned int vectors,int64_t *hashes, size_t *glo
 
 	while (threads < minthreads) {
 		if (opt_scrypt || opt_neoscrypt) {
-//			threads = 1 << (((opt_scrypt|| opt_neoscrypt) ? 0 : 15) + *intensity);
 			threads = 1 << *intensity;
 		}
 		if (threads < minthreads) {
