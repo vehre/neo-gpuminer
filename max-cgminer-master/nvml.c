@@ -1,8 +1,7 @@
 #include "config.h"
+#include "nvml.h"
 
 #ifdef HAVE_NVML
-
-#include "nvml.h"
 #include "nvidia/gdk/nvml.h"
 #include "miner.h"
 
@@ -26,5 +25,12 @@ float nvml_gpu_temp(const int dev) {
 void nvml_shutdown() {
 	nvmlShutdown();
 }
+#else
+void nvml_init() {}
 
+float nvml_gpu_temp(const int notused) {
+	return -1.0f;
+}
+
+void nvml_shutdown() {}
 #endif
