@@ -131,9 +131,7 @@ static inline int fsync (int fd)
 #ifdef HAVE_ADL
  #include "ADL_SDK/adl_sdk.h"
 #endif
-#ifdef HAVE_NVML
- #include "nvml.h"
-#endif
+#include "nvml.h"
 
 #ifdef USE_USBUTILS
   #include <libusb.h>
