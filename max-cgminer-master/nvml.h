@@ -9,7 +9,7 @@ extern float nvml_gpu_temp(const int);
 extern void nvml_shutdown();
 #else
 void nvml_init() {}
-float nvml_gpu_temp(const int) { return -1.0f; }
+float nvml_gpu_temp(const int notused) { return -1.0f; }
 void nvml_shutdown() {}
 #endif
 #endif // NVML_H
