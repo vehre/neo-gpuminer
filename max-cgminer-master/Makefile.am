@@ -27,7 +27,7 @@ bin_SCRIPTS	= $(top_srcdir)/*.cl
 cgminer_LDFLAGS	= $(PTHREAD_FLAGS)
 cgminer_LDADD	= $(DLOPEN_FLAGS) @LIBCURL_LIBS@ @JANSSON_LIBS@ @PTHREAD_LIBS@ \
 		  @OPENCL_LIBS@ @CURSES_LIBS@ @WS2_LIBS@ \
-		  @LIBUSB_LIBS@ @MM_LIBS@ @RT_LIBS@ \
+		  @LIBUSB_LIBS@ @MM_LIBS@ @RT_LIBS@ @NVML_LIBS@ \
 		  @MATH_LIBS@ lib/libgnu.a ccan/libccan.a
 
 if HAVE_WINDOWS
@@ -37,6 +37,7 @@ cgminer_CPPFLAGS = -I$(top_builddir)/lib -I$(top_srcdir)/lib @OPENCL_FLAGS@ @LIB
 endif
 
 cgminer_CPPFLAGS += $(ADL_CPPFLAGS)
+cgminer_CPPFLAGS += $(NVML_CFLAGS)
 
 # common sources
 cgminer_SOURCES := cgminer.c
@@ -54,6 +55,7 @@ cgminer_SOURCES += driver-opencl.h driver-opencl.c
 # the original GPU related sources, unchanged
 cgminer_SOURCES += ocl.c ocl.h findnonce.c findnonce.h
 cgminer_SOURCES += adl.c adl.h adl_functions.h
+cgminer_SOURCES += nvml.c nvml.h
 #cgminer_SOURCES += *.cl
 
 if HAS_SCRYPT

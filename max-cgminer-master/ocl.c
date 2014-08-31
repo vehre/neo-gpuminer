@@ -130,6 +130,7 @@ int clDevicesNum(void) {
 			continue;
 		}
 		applog(LOG_INFO, "Platform %d devices: %d", i, numDevices);
+		applog(LOG_INFO, "Device no. | device name          | OpenCL version");
 		if ((int)numDevices > most_devices) {
 			most_devices = numDevices;
 			mdplatform = i;
@@ -137,11 +138,13 @@ int clDevicesNum(void) {
 		if (numDevices) {
 			unsigned int j;
 			cl_device_id *devices = (cl_device_id *)malloc(numDevices*sizeof(cl_device_id));
+			char clvbuff[1024];
 
 			clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
 			for (j = 0; j < numDevices; j++) {
 				clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(pbuff), pbuff, NULL);
-				applog(LOG_INFO, "\t%i\t%s", j, pbuff);
+				clGetDeviceInfo(devices[j], CL_DEVICE_VERSION, sizeof(clvbuff), clvbuff, NULL);
+				applog(LOG_INFO, "   % 3i     | %-20s | %s", j, pbuff, clvbuff);
 			}
 			free(devices);
 		}
@@ -223,6 +226,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	cl_uint numPlatforms;
 	cl_uint numDevices;
 	cl_int status;
+	bool nvidia_platform= false;
 
 	status = clGetPlatformIDs(0, NULL, &numPlatforms);
 	if (status != CL_SUCCESS) {
@@ -256,8 +260,10 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 
 	applog(LOG_INFO, "CL Platform vendor: %s", pbuff);
 	status = clGetPlatformInfo(platform, CL_PLATFORM_NAME, sizeof(pbuff), pbuff, NULL);
-	if (status == CL_SUCCESS)
+	if (status == CL_SUCCESS) {
 		applog(LOG_INFO, "CL Platform name: %s", pbuff);
+		nvidia_platform= strstr(pbuff, "NVIDIA")> 0;
+	}
 	status = clGetPlatformInfo(platform, CL_PLATFORM_VERSION, sizeof(vbuff), vbuff, NULL);
 	if (status == CL_SUCCESS)
 		applog(LOG_INFO, "CL Platform version: %s", vbuff);
@@ -367,6 +373,14 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 			clState->hasOpenCL12plus = true;
 	}
 	free(devoclver);
+
+#ifdef HAVE_NVML
+	/* Check if the platform vendor is NVIDIA to active nvml support. */
+	if(nvidia_platform) {
+		cgpu->has_nvml= true;
+		applog(LOG_INFO, "Assuming NVIDIA managment for device: %d", gpu);
+	}
+#endif
 
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT, sizeof(cl_uint), (void *)&preferred_vwidth, NULL);
 	if (status != CL_SUCCESS) {

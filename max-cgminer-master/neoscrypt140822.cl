@@ -612,9 +612,16 @@ void fastkdf(const uchar *password, const uchar *salt, const uint salt_len,
 	if(b)
 		neoscrypt_copy(&A[j], (uchar *)password, b);
 #if (PASSWORD_LEN< BLAKE2S_BLOCK_SIZE)
-	neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], (uchar *)password, PASSWORD_LEN);
-	// Erase the remainder of the blake-block, when the password length is smaller
-	neoscrypt_erase(&A[FASTKDF_BUFFER_SIZE+ PASSWORD_LEN], BLAKE2S_BLOCK_SIZE- PASSWORD_LEN);
+	/* Initialise the password buffer */
+	a = BLAKE2S_BLOCK_SIZE / PASSWORD_LEN;
+	for(i = 0, j= 0; i < a; ++i, j+= PASSWORD_LEN)
+		neoscrypt_copy(&A[j], (uchar *)password, PASSWORD_LEN);
+	b= BLAKE2S_BLOCK_SIZE- j;
+	if(b)
+		neoscrypt_copy(&A[j], (uchar *)password, b);
+	//neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], (uchar *)password, PASSWORD_LEN);
+	//// Erase the remainder of the blake-block, when the password length is smaller
+	//neoscrypt_erase(&A[FASTKDF_BUFFER_SIZE+ PASSWORD_LEN], BLAKE2S_BLOCK_SIZE- PASSWORD_LEN);
 #else
 	neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], (uchar *)password, BLAKE2S_BLOCK_SIZE);
 #endif
@@ -635,7 +642,9 @@ void fastkdf(const uchar *password, const uchar *salt, const uint salt_len,
 
     /* The primary iteration */
     for(i = 0, bufidx = 0; i < N; ++i) {
-		/* Copy the PRF input buffer */
+		/* Copy the PRF input buffer byte by byte to make sure prf_input
+			starts at a well aligned address. Missing to do so may slow down
+			computation. */
 		for(j= 0, a= bufidx; j< BLAKE2S_BLOCK_SIZE; ++j, ++a)
 			prf_input[j]= A[a];
 

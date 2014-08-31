@@ -131,6 +131,9 @@ static inline int fsync (int fd)
 #ifdef HAVE_ADL
  #include "ADL_SDK/adl_sdk.h"
 #endif
+#ifdef HAVE_NVML
+ #include "nvml.h"
+#endif
 
 #ifdef USE_USBUTILS
   #include <libusb.h>
@@ -559,6 +562,10 @@ struct cgpu_info {
 	float gpu_vddc;
 	int gpu_engine_exit;
 	int gpu_memclock_exit;
+#endif
+#ifdef HAVE_NVML
+	bool has_nvml;
+
 #endif
 	int diff1;
 	double diff_accepted;

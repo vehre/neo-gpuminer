@@ -195,9 +195,38 @@ AC_ARG_ENABLE([adl],
 	[adl=$enableval]
 	)
 
+# Setup custom NVML paths
+AC_ARG_WITH([nvml-dir],
+   [AS_HELP_STRING(
+        [--with-nvml-dir=NVMLPATH],
+        [prefix where nvidia's management library (NVML) lib and includes is installed @<:@default=/usr@:>@])],
+   [NVML_INSTALL_PATH=$withval],
+   [NVML_INSTALL_PATH=/usr])
+AC_ARG_WITH([nvml-inc],
+   [AS_HELP_STRING(
+        [--with-nvml-inc=NVMLINCPATH],
+        [prefix where nvidia's management library (NVML) include files are installed @<:@default=NVMLPATH/include/nvidia@:>@])],
+   [NVML_INCLUDE_PATH=$withval],
+   [NVML_INCLUDE_PATH=$NVML_INSTALL_PATH/include])
+AC_ARG_WITH([nvml-lib],
+   [AS_HELP_STRING(
+        [--with-nvml-lib=PATH],
+        [prefix where nvidia's managment library (NVML) library is installed @<:@default=NVMLPATH/lib[64]@:>@])],
+   [NVML_LIB_PATH=$withval],
+   [nvml_lib_path=auto])
+
+if test "x$nvml_lib_path" == xauto; then
+	if test "x$have_x86_64" == xtrue ; then
+		NVML_LIB_PATH=$NVML_INSTALL_PATH/lib64
+	else
+		NVML_LIB_PATH=$NVML_INSTALL_PATH/lib
+	fi
+fi
+
 scrypt="no"
 keccak="no"
 neoscrypt="yes" dnl Currently set this to be active by default
+nvml="yes"
 
 if test "$found_opencl" = 1; then
 	if test "x$adl" != xno; then
@@ -240,6 +269,21 @@ dnl		)
 		)
 	if test "x$neoscrypt" = xyes; then
 		AC_DEFINE([USE_NEOSCRYPT], [1], [Defined to 1 if neoscrypt support is wanted])
+	fi
+
+	dnl Check if nvml is available
+	AC_ARG_ENABLE([nvml-check],
+		[AC_HELP_STRING([--disable-nvml-check], [Disable checking for Nvidia's management library's presence. NVML is used for GPU temp data currently only. (default enabled)])],
+		[nvml=$enableval]
+		)
+
+	if test "x$nvml" != xno ; then
+		AC_CHECK_FILE([$NVML_INCLUDE_PATH/nvidia/gdk/nvml.h], [have_nvml=true; NVML_CPPFLAGS=-I$NVML_INCLUDE_PATH], have_nvml=false,)
+		NVML_LIBS="-L$NVML_LIB_PATH/nvidia -lnvidia-ml"
+		AC_DEFINE([HAVE_NVML],[1],[Defined if Nvidia's management library is available])
+	fi
+	if test "x$have_nvml$have_adl" == xyesyes ; then
+		AC_MSG_ERROR([Both nvml and adl can't be present at once!])
 	fi
 else
 	DLOPEN_FLAGS=""
@@ -483,6 +527,8 @@ AC_SUBST(MM_LIBS)
 AC_SUBST(MATH_LIBS)
 AC_SUBST(RT_LIBS)
 AC_SUBST(ADL_CPPFLAGS)
+AC_SUBST(NVML_CFLAGS)
+AC_SUBST(NVML_LIBS)
 
 AC_CONFIG_FILES([
 	Makefile
@@ -561,6 +607,16 @@ else
 	echo "  ADL..................: Detection overrided. GPU monitoring support DISABLED"
 fi
 
+if test "x$nvml" != xno; then
+	if test x$have_nvml = xtrue; then
+		echo "  NVML.................: SDK found, GPU monitoring support enabled"
+	else
+		echo "  NVML.................: SDK NOT found, GPU monitoring support DISABLED"
+	fi
+else
+	echo "  NVML.................: Detection overrided. GPU monitoring support DISABLED"
+fi
+
 echo
 if test "x$avalon" = xyes; then
 	echo "  Avalon.ASICs.........: Enabled"
@@ -609,7 +665,7 @@ echo "Compilation............: make (or gmake)"
 echo "  CPPFLAGS.............: $CPPFLAGS"
 echo "  CFLAGS...............: $CFLAGS"
 echo "  LDFLAGS..............: $LDFLAGS $PTHREAD_FLAGS"
-echo "  LDADD................: $DLOPEN_FLAGS $LIBCURL_LIBS $JANSSON_LIBS $PTHREAD_LIBS $OPENCL_LIBS $CURSES_LIBS $WS2_LIBS $MATH_LIBS $LIBUSB_LIBS $RT_LIBS"
+echo "  LDADD................: $DLOPEN_FLAGS $LIBCURL_LIBS $JANSSON_LIBS $PTHREAD_LIBS $OPENCL_LIBS $CURSES_LIBS $WS2_LIBS $MATH_LIBS $LIBUSB_LIBS $RT_LIBS $NVML_LIBS"
 echo
 echo "Installation...........: make install (as root if needed, with 'su' or 'sudo')"
 echo "  prefix...............: $prefix"

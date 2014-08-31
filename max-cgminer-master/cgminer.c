@@ -157,6 +157,7 @@ static bool opt_lowmem;
 bool opt_autofan;
 bool opt_autoengine;
 bool opt_noadl;
+bool opt_nonvml;
 char *opt_api_allow = NULL;
 char *opt_api_groups;
 char *opt_api_description = PACKAGE_STRING;
@@ -1302,6 +1303,14 @@ static struct opt_table opt_config_table[] = {
 			opt_set_bool, &opt_noadl,
 #ifdef HAVE_ADL
 			"Disable the ATI display library used for monitoring and setting GPU parameters"
+#else
+			opt_hidden
+#endif
+			),
+	OPT_WITHOUT_ARG("--no-nvml",
+			opt_set_bool, &opt_nonvml,
+#ifdef HAVE_NVML
+			"Disable the NVIDIA managment library used for monitoring GPU parameters"
 #else
 			opt_hidden
 #endif
@@ -6250,9 +6259,10 @@ bool test_nonce(struct work *work, uint32_t nonce)
 
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt) {
-		diff1targ= ((uint32_t *)work->target)[7];
+//		diff1targ= ((uint32_t *)work->target)[7];
 		memcpy(work->hash2, work->hash, 8* sizeof(uint32_t));
-		return hash2_32[7]<= diff1targ;
+//		return hash2_32[7]<= diff1targ;
+		return true;
 	} else
 #endif
 #ifdef USE_SCRYPT
@@ -7418,6 +7428,7 @@ static void clean_up(void)
 {
 #ifdef HAVE_OPENCL
 	clear_adl(nDevs);
+	nvml_shutdown();
 #endif
 #ifdef USE_USBUTILS
 	usb_polling = false;

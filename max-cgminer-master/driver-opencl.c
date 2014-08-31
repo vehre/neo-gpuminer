@@ -51,6 +51,7 @@ extern bool opt_loginput;
 extern char *opt_kernel_path;
 extern int gpur_thr_id;
 extern bool opt_noadl;
+extern bool opt_nonvml;
 extern bool have_opencl;
 
 extern void *miner_thread(void *userdata);
@@ -1155,8 +1156,6 @@ static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __mayb
 	CL_SET_ARG(clState->CLbuffer0);
 	CL_SET_ARG(clState->outputBuffer);
 	CL_SET_ARG(clState->padbuffer8);
-//	CL_SET_VARG(4, &midstate[0]);
-//	CL_SET_VARG(4, &midstate[16]);
 	CL_SET_ARG(le_target);
 
 	return status;
@@ -1316,7 +1315,7 @@ static void opencl_detect(bool hotplug)
 	if (!nDevs)
 		return;
 
-	/* If opt_g_threads is not set, use default 1 thread on scrypt and
+	/* If opt_g_threads is not set, use default 1 thread on (neo-)scrypt and
 	 * 2 for regular mining */
 	if (opt_g_threads == -1) {
 		if (opt_scrypt)
@@ -1341,11 +1340,16 @@ static void opencl_detect(bool hotplug)
 		cgpu->device_id = i;
 		cgpu->threads = opt_g_threads;
 		cgpu->virtual_gpu = i;
+#ifdef HAVE_NVML
+		cgpu->has_nvml= false;
+#endif
 		add_cgpu(cgpu);
 	}
 
 	if (!opt_noadl)
 		init_adl(nDevs);
+	if (!opt_nonvml)
+		nvml_init();
 }
 
 static void reinit_opencl_device(struct cgpu_info *gpu)
@@ -1374,6 +1378,33 @@ static void get_opencl_statline_before(char *buf, size_t bufsiz, struct cgpu_inf
 		else
 			tailsprintf(buf, bufsiz, "        ");
 		tailsprintf(buf, bufsiz, "| ");
+	} else
+		gpu->drv->get_statline_before = &blank_get_statline_before;
+}
+#endif
+
+#ifdef HAVE_NVML
+static void get_opencl_statline_before(char *buf, size_t bufsiz, struct cgpu_info *gpu)
+{
+	if (!opt_nonvml&& gpu->has_nvml) {
+		int gpuid = gpu->device_id;
+		float gt = nvml_gpu_temp(gpuid);
+//		int gf = gpu_fanspeed(gpuid);
+		int gp;
+
+		if (gt != -1)
+			tailsprintf(buf, bufsiz, "%5.1fC ", gt);
+		else
+			tailsprintf(buf, bufsiz, "       ");
+/*		if (gf != -1)
+			// show invalid as 9999
+			tailsprintf(buf, bufsiz, "%4dRPM ", gf > 9999 ? 9999 : gf);
+		else if ((gp = gpu_fanpercent(gpuid)) != -1)
+			tailsprintf(buf, bufsiz, "%3d%%    ", gp);
+		else
+			tailsprintf(buf, bufsiz, "        ");
+		tailsprintf(buf, bufsiz, "| ");*/
+		tailsprintf(buf, bufsiz, "        | ");
 	} else
 		gpu->drv->get_statline_before = &blank_get_statline_before;
 }
@@ -1688,7 +1719,7 @@ struct device_drv opencl_drv = {
 	.name = "GPU",
 	.drv_detect = opencl_detect,
 	.reinit_device = reinit_opencl_device,
-#ifdef HAVE_ADL
+#if defined(HAVE_ADL) || defined(HAVE_NVML)
 	.get_statline_before = get_opencl_statline_before,
 #endif
 	.get_statline = get_opencl_statline,
