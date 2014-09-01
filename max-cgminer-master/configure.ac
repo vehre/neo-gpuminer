@@ -272,8 +272,8 @@ dnl		)
 	fi
 
 	dnl Check if nvml is available
-	AC_ARG_ENABLE([nvml-check],
-		[AC_HELP_STRING([--disable-nvml-check], [Disable checking for Nvidia's management library's presence. NVML is used for GPU temp data currently only. (default enabled)])],
+	AC_ARG_ENABLE([nvml],
+		[AC_HELP_STRING([--disable-nvml], [Disable checking for Nvidia's management library's presence. NVML is used for GPU temp data currently only. (default enabled)])],
 		[nvml=$enableval]
 		)
 
@@ -281,9 +281,6 @@ dnl		)
 		AC_CHECK_FILE([$NVML_INCLUDE_PATH/nvidia/gdk/nvml.h], [have_nvml=true; NVML_CPPFLAGS=-I$NVML_INCLUDE_PATH], have_nvml=false,)
 		NVML_LIBS="-L$NVML_LIB_PATH/nvidia -lnvidia-ml"
 		AC_DEFINE([HAVE_NVML],[1],[Defined if Nvidia's management library is available])
-	fi
-	if test "x$have_nvml$have_adl" == xyesyes ; then
-		AC_MSG_ERROR([Both nvml and adl can't be present at once!])
 	fi
 else
 	DLOPEN_FLAGS=""

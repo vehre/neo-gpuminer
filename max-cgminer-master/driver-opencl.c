@@ -1357,9 +1357,9 @@ static void reinit_opencl_device(struct cgpu_info *gpu)
 	tq_push(control_thr[gpur_thr_id].q, gpu);
 }
 
-#ifdef HAVE_ADL
 static void get_opencl_statline_before(char *buf, size_t bufsiz, struct cgpu_info *gpu)
 {
+#ifdef HAVE_ADL
 	if (gpu->has_adl) {
 		int gpuid = gpu->device_id;
 		float gt = gpu_temp(gpuid);
@@ -1379,13 +1379,8 @@ static void get_opencl_statline_before(char *buf, size_t bufsiz, struct cgpu_inf
 			tailsprintf(buf, bufsiz, "        ");
 		tailsprintf(buf, bufsiz, "| ");
 	} else
-		gpu->drv->get_statline_before = &blank_get_statline_before;
-}
 #endif
-
 #ifdef HAVE_NVML
-static void get_opencl_statline_before(char *buf, size_t bufsiz, struct cgpu_info *gpu)
-{
 	if (!opt_nonvml&& gpu->has_nvml) {
 		int gpuid = gpu->device_id;
 		float gt = nvml_gpu_temp(gpuid);
@@ -1406,9 +1401,10 @@ static void get_opencl_statline_before(char *buf, size_t bufsiz, struct cgpu_inf
 		tailsprintf(buf, bufsiz, "| ");*/
 		tailsprintf(buf, bufsiz, "        | ");
 	} else
+#endif
 		gpu->drv->get_statline_before = &blank_get_statline_before;
 }
-#endif
+
 
 static void get_opencl_statline(char *buf, size_t bufsiz, struct cgpu_info *gpu)
 {
