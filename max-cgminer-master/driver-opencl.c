@@ -1382,24 +1382,20 @@ static void get_opencl_statline_before(char *buf, size_t bufsiz, struct cgpu_inf
 #endif
 #ifdef HAVE_NVML
 	if (!opt_nonvml&& gpu->has_nvml) {
-		int gpuid = gpu->device_id;
-		float gt = nvml_gpu_temp(gpuid);
-//		int gf = gpu_fanspeed(gpuid);
-		int gp;
+		int gpuid = gpu->device_id, fanspeed;
+		float temperature;
+		nvml_gpu_temp_and_fanspeed(gpuid, &temperature, &fanspeed);
 
-		if (gt != -1)
-			tailsprintf(buf, bufsiz, "%5.1fC ", gt);
+		if (temperature> 0.0)
+			tailsprintf(buf, bufsiz, "%5.1fC ", temperature);
 		else
 			tailsprintf(buf, bufsiz, "       ");
-/*		if (gf != -1)
+		if (fanspeed> 0)
 			// show invalid as 9999
-			tailsprintf(buf, bufsiz, "%4dRPM ", gf > 9999 ? 9999 : gf);
-		else if ((gp = gpu_fanpercent(gpuid)) != -1)
-			tailsprintf(buf, bufsiz, "%3d%%    ", gp);
+			tailsprintf(buf, bufsiz, "%4dRPM ", fanspeed > 9999 ? 9999 : fanspeed);
 		else
 			tailsprintf(buf, bufsiz, "        ");
-		tailsprintf(buf, bufsiz, "| ");*/
-		tailsprintf(buf, bufsiz, "        | ");
+		tailsprintf(buf, bufsiz, "| ");
 	} else
 #endif
 		gpu->drv->get_statline_before = &blank_get_statline_before;

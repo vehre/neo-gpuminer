@@ -4,6 +4,6 @@
 #include "config.h"
 
 extern void nvml_init();
-extern float nvml_gpu_temp(const int);
+extern void nvml_gpu_temp_and_fanspeed(const int, float *, int *);
 extern void nvml_shutdown();
 #endif // NVML_H

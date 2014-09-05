@@ -279,8 +279,9 @@ dnl		)
 
 	if test "x$nvml" != xno ; then
 		AC_CHECK_FILE([$NVML_INCLUDE_PATH/nvidia/gdk/nvml.h], [have_nvml=true; NVML_CPPFLAGS=-I$NVML_INCLUDE_PATH], have_nvml=false,)
-		NVML_LIBS="-L$NVML_LIB_PATH/nvidia -lnvidia-ml"
-		AC_DEFINE([HAVE_NVML],[1],[Defined if Nvidia's management library is available])
+		if test "x$have_nvml" == xtrue; then
+			AC_DEFINE([HAVE_NVML],[1],[Defined if Nvidia's management library is available])
+		fi
 	fi
 else
 	DLOPEN_FLAGS=""
@@ -525,7 +526,6 @@ AC_SUBST(MATH_LIBS)
 AC_SUBST(RT_LIBS)
 AC_SUBST(ADL_CPPFLAGS)
 AC_SUBST(NVML_CFLAGS)
-AC_SUBST(NVML_LIBS)
 
 AC_CONFIG_FILES([
 	Makefile

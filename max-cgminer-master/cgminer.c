@@ -2887,12 +2887,6 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 #if defined(USE_SCRYPT)	&& defined(USE_NEOSCRYPT)
 				(unsigned long)swab32(*(uint32_t *)&(work->data[(opt_scrypt|| opt_neoscrypt) ? 32 : 28])),
 				(unsigned long)swab32(*(uint32_t *)&(work->data[(opt_scrypt|| opt_neoscrypt) ? 28 : 24])),
-#elif defined(USE_SCRYPT)
-				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_scrypt ? 32 : 28])),
-				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_scrypt ? 28 : 24])),
-#elif defined(USE_NEOSCRYPT)
-				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_neoscrypt ? 32 : 28])),
-				(unsigned long)swab32(*(uint32_t *)&(work->data[opt_neoscrypt ? 28 : 24])),
 #else
 				(unsigned long)swab32(*(uint32_t *)&(work->data[28])),
 				(unsigned long)swab32(*(uint32_t *)&(work->data[24])),
@@ -3407,6 +3401,7 @@ static struct curl_ent *pop_curl_entry(struct pool *pool)
 	int curl_limit = opt_delaynet ? 5 : (mining_threads + opt_queue) * 2;
 	bool recruited = false;
 	struct curl_ent *ce;
+	applog(LOG_DEBUG, "curl_limit: %d, #curls= %d", curl_limit, pool->curls);
 
 	mutex_lock(&pool->pool_lock);
 retry:
