@@ -5636,7 +5636,13 @@ static void *stratum_sthread(void *userdata)
 
 		memset(nonce2, 0, 8);
 		/* We only use uint32_t sized nonce2 increments internally */
-		memcpy(nonce2, &work->nonce2, sizeof(uint32_t));
+		if(opt_neoscrypt) {
+			if(work->nonce2_len== 4)
+				*((uint32_t *)nonce2)= be32toh(work->nonce2);
+			else
+				((uint32_t *)nonce2)[1]= be32toh(work->nonce2);
+		} else
+			memcpy(nonce2, &work->nonce2, sizeof(uint32_t));
 		__bin2hex(nonce2hex, (const unsigned char *)nonce2, work->nonce2_len);
 
 		snprintf(s, sizeof(s),
@@ -6056,9 +6062,11 @@ void set_target_neoscrypt(unsigned char *target, double diff)
 		((uint32_t *)target)[k + 1] = (uint32_t)(m >> 32);
 	}
 	if (opt_debug) {
-		char *htarget = bin2hex(target, 32);
+		uint32_t swaped[8];
+		swab256(swaped, target);
+		char *htarget = bin2hex((unsigned char *)swaped, 32);
 
-		applog(LOG_DEBUG, "Generated neoscrypt target %sx0", htarget);
+		applog(LOG_DEBUG, "Generated neoscrypt target 0x%s", htarget);
 		free(htarget);
 	}
 }
@@ -6115,6 +6123,8 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
 		((uint32_t *)work->data)[17]= be32toh(temp);
 		hex2bin((unsigned char *)&temp, pool->swork.nbit, 4);
 		((uint32_t *)work->data)[18]= be32toh(temp);
+		((uint32_t *)work->data)[20]= 0x80000000;
+		((uint32_t *)work->data)[31]= 0x00000280;
 	} else
 #endif
 		memcpy(work->data, pool->header_bin, 128);
@@ -6258,10 +6268,9 @@ bool test_nonce(struct work *work, uint32_t nonce)
 
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt) {
-//		diff1targ= ((uint32_t *)work->target)[7];
+		diff1targ= ((uint32_t *)work->target)[7];
 		memcpy(work->hash2, work->hash, 8* sizeof(uint32_t));
-//		return hash2_32[7]<= diff1targ;
-		return true;
+		return hash2_32[7]<= diff1targ;
 	} else
 #endif
 #ifdef USE_SCRYPT

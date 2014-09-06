@@ -677,6 +677,7 @@ bool fulltest(const unsigned char *hash, const unsigned char *target)
 		if(opt_neoscrypt) {
 			h32tmp = htole32(hash32[i]);
 			t32tmp = htobe32(target32[i]);
+			hash32[i]= swab32(hash32[i]); /* for printing */
 		} else
 #endif
 		{
@@ -698,7 +699,7 @@ bool fulltest(const unsigned char *hash, const unsigned char *target)
 		hash_str = bin2hex(hash_swap, 32);
 		target_str = bin2hex(target_swap, 32);
 
-		applog(LOG_DEBUG, " Proof: %sx0\nTarget: %sx0\nTrgVal? %s",
+		applog(LOG_DEBUG, " Proof: 0x%s\nTarget: 0x%s\nTrgVal? %s",
 			hash_str,
 			target_str,
 			rc ? "YES (hash <= target)" :

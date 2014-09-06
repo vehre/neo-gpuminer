@@ -37,3 +37,10 @@ lib/stdint.h
 lib/warn-on-use.h
 mkinstalldirs
 *.swp
+bin/MD5SUM
+neoscrypt.creator*
+neoscrypt.includes
+neoscrypt.files
+neoscrypt.config
+do_mine.sh
+condconf.sh

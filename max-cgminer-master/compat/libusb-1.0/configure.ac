@@ -78,7 +78,7 @@ case $backend in
 linux)
 	AC_DEFINE(OS_LINUX, 1, [Linux backend])
 	AC_SUBST(OS_LINUX)
-	AC_CHECK_LIB(rt, clock_gettime, -pthread)
+	AC_SEARCH_LIBS(clock_gettime, rt, [], [], -pthread)
 	AC_ARG_ENABLE([udev],
                       [AC_HELP_STRING([--with-udev], [use udev for device enumeration and hotplug support (recommended, default: yes)])],
                       [], [enable_udev="yes"])
