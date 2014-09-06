@@ -102,6 +102,7 @@ bool opt_quiet;
 bool opt_realquiet;
 bool opt_loginput;
 bool opt_compact;
+bool opt_fresh = false;
 const int opt_cutofftemp = 95;
 int opt_log_interval = 5;
 int opt_queue = 1;
@@ -1074,6 +1075,9 @@ static char *set_null(const char __maybe_unused *arg)
 
 /* These options are available from config file or commandline */
 static struct opt_table opt_config_table[] = {
+	OPT_WITHOUT_ARG("--always-fresh",
+			opt_set_bool, &opt_fresh,
+			"Force curl to always use a fresh connection (use only when you exprience strange hangs in pool communication)"),
 	OPT_WITH_ARG("--api-allow",
 		     set_api_allow, NULL, NULL,
 		     "Allow API access only to the given list of [G:]IP[/Prefix] addresses[/subnets]"),
@@ -6979,7 +6983,8 @@ retry_pool:
 		 * and any number of issues could have come up in the meantime
 		 * so always establish a fresh connection instead of relying on
 		 * a persistent one. */
-		curl_easy_setopt(curl, CURLOPT_FRESH_CONNECT, 1);
+		if(opt_fresh)
+			curl_easy_setopt(curl, CURLOPT_FRESH_CONNECT, 1);
 		val = json_rpc_call(curl, lp_url, pool->rpc_userpass,
 				    lpreq, false, true, &rolltime, pool, false);
 
