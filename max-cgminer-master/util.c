@@ -1667,7 +1667,10 @@ bool parse_method(struct pool *pool, char *s)
 
 	if (!s)
 		return ret;
-
+	if(opt_debug&& opt_protocol) {
+		fprintf(stderr, "JSON: %s", s);
+		fflush(stderr);
+	}
 	val = JSON_LOADS(s, &err);
 	if (!val) {
 		applog(LOG_INFO, "JSON decode failed(%d): %s", err.line, err.text);

@@ -447,145 +447,6 @@ void blake2s(const void *input, const uint input_size,
     neoscrypt_copy(output, S.h, output_size);
 }
 
-#if 0
-/* FastKDF, a fast buffered key derivation function:
- * FASTKDF_BUFFER_SIZE must be a power of 2;
- * password_len, salt_len and output_len should not exceed FASTKDF_BUFFER_SIZE;
- * prf_output_size must be <= prf_key_size; */
-void fastkdf(const uchar *password, uint N, uchar *output, uint output_len) {
-	// FASTKDF_BUFFER_SIZE  256U
-	// BLAKE2S_BLOCK_SIZE    64U
-	// BLAKE2S_KEY_SIZE      32U
-	// BLAKE2S_OUT_SIZE      32U
-#if 0
-    uint4 A[(FASTKDF_BUFFER_SIZE + BLAKE2S_BLOCK_SIZE)/ sizeof(uint4)],
-		B[(FASTKDF_BUFFER_SIZE + BLAKE2S_KEY_SIZE)/ sizeof(uint4)];
-	uchar prf_output[BLAKE2S_OUT_SIZE];
-	uchar *prf_input, *prf_key, *ucBptr, *ucAptr;
-    uint bufidx, a, b, i, j;
-
-	// password_len is 4*4= 16 byte, i.e. a copy is done copying the unit4
-    /* Initialise the password and salt buffer */
-	{
-		// Some pointers to help iterating
-		uint4 *hP1= A, *hP2= B;
-
-		// kdf_buf_size>> (sizeof(uint4)>> 2) means:
-		// kdf_buf_size/ (sizeof(uint4)/ 4) but bitshifts are usually faster
-#pragma unroll
-		for(i = (FASTKDF_BUFFER_SIZE>> (sizeof(uint4)>> 2)); i; --i, ++hP1, ++hP2) {
-			// neoscrypt_copy(&A[i * password_len], &password[0], password_len);
-			*hP1= password;
-			*hP2= salt;
-		}
-
-		//neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], &password[0], prf_input_size);
-#pragma unroll
-		for(i= BLAKE2S_BLOCK_SIZE>> (sizeof(uint4)>> 2); i; --i, ++hP1)
-			*hP1= password;
-#pragma unroll
-		for(i= BLAKE2S_KEY_SIZE>> (sizeof(uint4)>> 2); i; --i, ++hP2)
-			*hP2= salt;
-	}
-	ucAptr= (uchar *)A;
-	ucBptr= (uchar *)B;
-
-#endif
-
-	uchar A[FASTKDF_BUFFER_SIZE + BLAKE2S_BLOCK_SIZE];
-	uchar B[FASTKDF_BUFFER_SIZE + BLAKE2S_KEY_SIZE];
-	uchar prf_output[BLAKE2S_OUT_SIZE], prf_input[BLAKE2S_BLOCK_SIZE],
-		prf_key[BLAKE2S_KEY_SIZE];
-	uint bufidx, a, b, i, j;
-
-	/* Initialise the password and salt buffer */
-	a = FASTKDF_BUFFER_SIZE / PASSWORD_LEN;
-	for(i= 0; i< a; ++i) {
-		neoscrypt_copy(&A[i * PASSWORD_LEN], (uchar *)password, PASSWORD_LEN);
-		neoscrypt_copy(&B[i * PASSWORD_LEN], (uchar *)password, PASSWORD_LEN);
-	}
-	b= FASTKDF_BUFFER_SIZE- a* PASSWORD_LEN;
-	if(b) {
-		neoscrypt_copy(&A[a * PASSWORD_LEN], (uchar *)password, b);
-		neoscrypt_copy(&B[a * PASSWORD_LEN], (uchar *)password, b);
-	}
-#if (PASSWORD_LEN< BLAKE2S_BLOCK_SIZE)
-	neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], (uchar *)password, PASSWORD_LEN);
-	// Erase the remainder of the blake-block, when the password length is smaller
-	neoscrypt_erase(&A[FASTKDF_BUFFER_SIZE+ PASSWORD_LEN], BLAKE2S_BLOCK_SIZE- PASSWORD_LEN);
-#else
-	neoscrypt_copy(&A[FASTKDF_BUFFER_SIZE], (uchar *)password, BLAKE2S_BLOCK_SIZE);
-#endif
-#if (PASSWORD_LEN< BLAKE2S_KEY_SIZE)
-	neoscrypt_copy(&B[FASTKDF_BUFFER_SIZE], (uchar *)password, PASSWORD_LEN);
-	// Erase the remainder of the blake-key, when the password length is smaller
-	neoscrypt_erase(&B[FASTKDF_BUFFER_SIZE+ PASSWORD_LEN], BLAKE2S_KEY_SIZE- PASSWORD_LEN);
-#else
-	neoscrypt_copy(&B[FASTKDF_BUFFER_SIZE], (uchar *)password, BLAKE2S_KEY_SIZE);
-#endif
-
-    /* The primary iteration */
-    for(i = 0, bufidx = 0; i < N; ++i) {
-        /* Copy the PRF input buffer */
-		for(j= 0, a= bufidx; j< BLAKE2S_BLOCK_SIZE; ++j, ++a)
-			prf_input[j]= A[a];
-
-        /* Copy the PRF key buffer */
-		for(j= 0, a= bufidx; j< BLAKE2S_KEY_SIZE; ++j, ++a)
-			prf_key[j]= B[a];
-
-        /* PRF */
-        blake2s(prf_input, BLAKE2S_BLOCK_SIZE,
-				prf_key, BLAKE2S_KEY_SIZE,
-				prf_output, BLAKE2S_OUT_SIZE);
-
-        /* Calculate the next buffer pointer */
-        for(j = 0, bufidx = 0; j< BLAKE2S_OUT_SIZE; j++)
-			bufidx += prf_output[j];
-        bufidx &= (FASTKDF_BUFFER_SIZE - 1);
-
-        /* Modify the salt buffer */
-		//neoscrypt_xor(&B[bufidx], &prf_output[0], BLAKE2S_OUT_SIZE);
-		for(j= 0, a=bufidx; j< BLAKE2S_OUT_SIZE; ++j, ++a)
-			B[a]^= prf_output[j];
-
-        /* Head modified, tail updated */
-        if(bufidx < BLAKE2S_KEY_SIZE)
-			//neoscrypt_copy(&B[FASTKDF_BUFFER_SIZE + bufidx], &B[bufidx],
-			//	min(BLAKE2S_OUT_SIZE, BLAKE2S_KEY_SIZE- bufidx));
-			for(j= 0, a= FASTKDF_BUFFER_SIZE + bufidx, b= bufidx;
-					j< min(BLAKE2S_OUT_SIZE, BLAKE2S_KEY_SIZE- bufidx); ++j, ++a, ++b)
-				B[a]= B[b];
-
-        /* Tail modified, head updated */
-        if((FASTKDF_BUFFER_SIZE - bufidx) < BLAKE2S_OUT_SIZE)
-			neoscrypt_copy(B, &B[FASTKDF_BUFFER_SIZE],
-				BLAKE2S_OUT_SIZE - (FASTKDF_BUFFER_SIZE - bufidx));
-    }
-
-    /* Modify and copy into the output buffer */
-    if(output_len > FASTKDF_BUFFER_SIZE)
-		output_len= FASTKDF_BUFFER_SIZE;
-
-    a = FASTKDF_BUFFER_SIZE - bufidx;
-    if(a >= output_len) {
-//      neoscrypt_xor(&B[bufidx], A, output_len);
-//		neoscrypt_copy(&output[0], &B[bufidx], output_len);
-		for(j= 0, i= bufidx; j< output_len; ++j, ++i)
-			output[j]= B[i]^ A[j];
-    } else {
-//        neoscrypt_xor(&B[bufidx], A, a);
-//        neoscrypt_xor(B, &A[a], output_len - a);
-//        neoscrypt_copy(&output[0], &B[bufidx], a);
-//        neoscrypt_copy(&output[a], &B[0], output_len - a);
-		for(j= 0, i= bufidx; j< a; ++j, ++i)
-			output[j]= B[i]^ A[j];
-		for(j= a, i= 0; i< output_len- a; ++j, ++i)
-			output[j]= B[i]^ A[j];
-    }
-}
-#endif
-
 /* FastKDF, a fast buffered key derivation function:
  * FASTKDF_BUFFER_SIZE must be a power of 2;
  * password_len, salt_len and output_len should not exceed FASTKDF_BUFFER_SIZE;
@@ -865,9 +726,9 @@ __kernel void search(__global const uchar* restrict input,
 
 #ifdef TEST
 	fastkdf(data, X, FASTKDF_BUFFER_SIZE, 32, outbuf, 32);
-	((uint *)outbuf)[8]= target;
+	//((uint *)outbuf)[8]= target;
 	for(i= 0; i< OUTPUT_LEN; ++i)
-		output[i]= outbuf[i];
+		output[get_local_id(0)* OUTPUT_LEN+ i]= outbuf[i];
 #else
 	/* output = KDF(password, X) */
 	fastkdf(data, X, FASTKDF_BUFFER_SIZE, 32, outbuf, 32);

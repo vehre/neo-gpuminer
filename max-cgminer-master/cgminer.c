@@ -5622,10 +5622,10 @@ static void *stratum_sthread(void *userdata)
 		sshare->work = work;
 #ifdef USE_NEOSCRYPT
 		if(opt_neoscrypt)
-			nonce= htobe32(*((uint32_t *)(work->data + 76)));
+			nonce= htobe32(((uint32_t *)work->data)[19]);
 		else
 #endif
-			nonce = *((uint32_t *)(work->data + 76));
+			nonce = ((uint32_t *)work->data)[19];
 		__bin2hex(noncehex, (const unsigned char *)&nonce, 4);
 		memset(s, 0, 1024);
 
@@ -5638,9 +5638,9 @@ static void *stratum_sthread(void *userdata)
 		/* We only use uint32_t sized nonce2 increments internally */
 		if(opt_neoscrypt) {
 			if(work->nonce2_len== 4)
-				*((uint32_t *)nonce2)= be32toh(work->nonce2);
+				*((uint32_t *)nonce2)= htobe32(work->nonce2);
 			else
-				((uint32_t *)nonce2)[1]= be32toh(work->nonce2);
+				((uint32_t *)nonce2)[1]= htobe32(work->nonce2);
 		} else
 			memcpy(nonce2, &work->nonce2, sizeof(uint32_t));
 		__bin2hex(nonce2hex, (const unsigned char *)nonce2, work->nonce2_len);
@@ -6062,6 +6062,16 @@ void set_target_neoscrypt(unsigned char *target, double diff)
 		((uint32_t *)target)[k + 1] = (uint32_t)(m >> 32);
 	}
 	if (opt_debug) {
+		/* The target is computed in this systems endianess and stored
+		 * in its endianess on a uint32-level. But because the target are
+		 * eight uint32s, they are stored in mixed mode, i.e., each uint32
+		 * is stored in the local endianess, but the least significant bit
+		 * is stored in target[0] bit 0.
+		 *
+		 * To print this large number in a native human readable form the
+		 * order of the array entries is swapped, i.e., target[7] <-> target[0]
+		 * and each array entry is byte swapped to have the least significant
+		 * bit to the right. */
 		uint32_t swaped[8];
 		swab256(swaped, target);
 		char *htarget = bin2hex((unsigned char *)swaped, 32);
@@ -6078,7 +6088,6 @@ void set_target_neoscrypt(unsigned char *target, double diff)
 static void gen_stratum_work(struct pool *pool, struct work *work)
 {
 	unsigned char merkle_root[32], merkle_sha[64];
-	uint32_t *data32, *swap32;
 	int i;
 
 	cg_wlock(&pool->data_lock);
@@ -6104,22 +6113,29 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
 		memcpy(merkle_sha, merkle_root, 32);
 	}
 
-	data32 = (uint32_t *)merkle_sha;
-	swap32 = (uint32_t *)merkle_root;
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt) {
 		/* Incoming data is in little endian. */
 		memcpy(merkle_root, merkle_sha, 32);
 	} else
 #endif
-		flip32(swap32, data32);
+		flip32((uint32_t *)merkle_root, (uint32_t *)merkle_sha);
 
 	/* Copy the data template from header_bin */
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt) {
-		uint32_t temp;
-		flip32(work->data, pool->header_bin);
+		uint32_t temp= pool->merkle_offset/ sizeof(uint32_t), i;
+		/* Put version (4 byte) + prev_hash (4 byte* 8) but big endian encoded
+		 * into work. */
+		for(i= 0; i< temp; ++i)
+			((uint32_t *)work->data)[i]= be32toh(((uint32_t *)pool->header_bin)[i]);
+		/* Now add the merkle_root (4 byte* 8), but it is encoded in little endian. */
+		temp+= 8;
+		for(int j= 0 ;i< temp; ++i, ++j )
+			((uint32_t *)work->data)[i]= le32toh(((uint32_t *)merkle_root)[j]);
+		/* Add the time encoded in big endianess. */
 		hex2bin((unsigned char *)&temp, pool->swork.ntime, 4);
+		/* Add the nbits (big endianess). */
 		((uint32_t *)work->data)[17]= be32toh(temp);
 		hex2bin((unsigned char *)&temp, pool->swork.nbit, 4);
 		((uint32_t *)work->data)[18]= be32toh(temp);
@@ -6127,8 +6143,10 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
 		((uint32_t *)work->data)[31]= 0x00000280;
 	} else
 #endif
+	{
 		memcpy(work->data, pool->header_bin, 128);
-	memcpy(work->data + pool->merkle_offset, merkle_root, 32);
+		memcpy(work->data + pool->merkle_offset, merkle_root, 32);
+	}
 
 	/* Store the stratum work diff to check it still matches the pool's
 	 * stratum diff when submitting shares */
@@ -6270,7 +6288,10 @@ bool test_nonce(struct work *work, uint32_t nonce)
 	if(opt_neoscrypt) {
 		diff1targ= ((uint32_t *)work->target)[7];
 		memcpy(work->hash2, work->hash, 8* sizeof(uint32_t));
-		return hash2_32[7]<= diff1targ;
+		bool rc= hash2_32[7]<= diff1targ;
+		if(!rc&& opt_debug)
+			applog(LOG_DEBUG, "(Hash[7]= %u)> (target[7]= %u)", hash2_32[7], diff1targ);
+		return rc;
 	} else
 #endif
 #ifdef USE_SCRYPT

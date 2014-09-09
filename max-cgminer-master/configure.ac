@@ -227,19 +227,19 @@ scrypt="no"
 keccak="no"
 neoscrypt="yes" dnl Currently set this to be active by default
 nvml="yes"
+dlneeded="unknown"
 
 if test "$found_opencl" = 1; then
 	if test "x$adl" != xno; then
 		ADL_CPPFLAGS=
-		AC_CHECK_FILE([$srcdir/ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS=-I$srcdir], have_adl=false,)
+		AC_CHECK_HEADERS([$srcdir/ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS=-I$srcdir], have_adl=false,)
 		if test x$have_adl+$have_cgminer_sdk = xfalse+true; then
-			AC_CHECK_FILE([$CGMINER_SDK/include/ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS=-I$CGMINER_SDK/include], have_adl=false,)
+			AC_CHECK_HEADERS([$CGMINER_SDK/include/ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS=-I$CGMINER_SDK/include], have_adl=false,)
 		fi
 		if test x$have_adl = xtrue
 		then
 			AC_DEFINE([HAVE_ADL], [1], [Defined if ADL headers were found])
-		else
-			DLOPEN_FLAGS=""
+			dlneeded="yes"
 		fi
 	fi
 
@@ -278,14 +278,18 @@ dnl		)
 		)
 
 	if test "x$nvml" != xno ; then
-		AC_CHECK_FILE([$NVML_INCLUDE_PATH/nvidia/gdk/nvml.h], [have_nvml=true; NVML_CPPFLAGS=-I$NVML_INCLUDE_PATH], have_nvml=false,)
+		AC_CHECK_HEADERS([$NVML_INCLUDE_PATH/nvidia/gdk/nvml.h], [have_nvml=true; NVML_CPPFLAGS=-I$NVML_INCLUDE_PATH], have_nvml=false,)
 		if test "x$have_nvml" == xtrue; then
 			AC_DEFINE([HAVE_NVML],[1],[Defined if Nvidia's management library is available])
+			dlneeded="yes"
 		fi
 	fi
-else
+fi
+
+if test "x$dlneeded" != xyes ; then
 	DLOPEN_FLAGS=""
 fi
+
 
 AM_CONDITIONAL([HAS_SCRYPT], [test x$scrypt = xyes])
 AM_CONDITIONAL([HAS_KECCAK], [test x$keccak = xyes])
