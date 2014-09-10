@@ -100,12 +100,18 @@ void neoscrypt_blkcpy(void *dstp, const void *srcp, uint len) {
     OPTIMAL_TYPE *src = (OPTIMAL_TYPE *) srcp;
     uint i;
 
-    for(i = 0; i < (len / sizeof(OPTIMAL_TYPE)); i += 4) {
+#ifdef WITH_UNROLL
+#pragma unroll(1<< max(0, (32- sizeof(OPTIMAL_TYPE))>> 2))
+    for(i = 0; i < (len / sizeof(OPTIMAL_TYPE)); ++i)
+        dst[i]     = src[i];
+#else
+	for(i = 0; i < (len / sizeof(OPTIMAL_TYPE)); i += 4) {
         dst[i]     = src[i];
         dst[i + 1] = src[i + 1];
         dst[i + 2] = src[i + 2];
         dst[i + 3] = src[i + 3];
     }
+#endif
 }
 void neoscrypt_gl_blkcpy(__global void *dstp, const void *srcp, uint len) {
     __global OPTIMAL_TYPE *dst = (__global OPTIMAL_TYPE *) dstp;
@@ -728,7 +734,7 @@ __kernel void search(__global const uchar* restrict input,
 	fastkdf(data, X, FASTKDF_BUFFER_SIZE, 32, outbuf, 32);
 	//((uint *)outbuf)[8]= target;
 	for(i= 0; i< OUTPUT_LEN; ++i)
-		output[get_local_id(0)* OUTPUT_LEN+ i]= outbuf[i];
+		output[i]= outbuf[i];
 #else
 	/* output = KDF(password, X) */
 	fastkdf(data, X, FASTKDF_BUFFER_SIZE, 32, outbuf, 32);
