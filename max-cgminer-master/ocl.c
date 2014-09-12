@@ -614,7 +614,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	if (!binaryfile) {
 		applog(LOG_DEBUG, "No binary found, generating from source");
 	} else {
-		struct stat binary_stat;
+		struct stat binary_stat, source_stat;
 
 		if (unlikely(stat(binaryfilename, &binary_stat))) {
 			applog(LOG_DEBUG, "Unable to stat binary, generating from source");
@@ -623,6 +623,18 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		}
 		if (!binary_stat.st_size)
 			goto build;
+
+		if (unlikely(stat(filename, &source_stat))) {
+			applog(LOG_DEBUG, "Unable to stat source file");
+		} else {
+			/* Check whether the source file is newer than the binary filename
+			 * and regenerate when true. */
+			if(difftime(source_stat.st_mtime, binary_stat.st_mtime)> 0.0) {
+				/* Source new than binary, rebuild. */
+				fclose(binaryfile);
+				goto build;
+			}
+		}
 
 		binary_sizes[slot] = binary_stat.st_size;
 		binaries[slot] = (char *)calloc(binary_sizes[slot], 1);

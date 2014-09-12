@@ -604,9 +604,6 @@ void neoscrypt_blkmix(uint *X, /*uint *Y, uint r,*/ uint mixmode) {
 	neoscrypt_blkswp(&X[16], &X[32], BLOCK_SIZE);
 }
 
-#define SCRYPT_FOUND (0xFF)
-#define SETFOUND(Xnonce) output[output[SCRYPT_FOUND]++] = Xnonce
-
 /* NeoScrypt core engine:
  * p = 1, salt = password;
  * Basic customisation (required):
@@ -739,7 +736,13 @@ __kernel void search(__global const uchar* restrict input,
 	/* output = KDF(password, X) */
 	fastkdf(data, X, FASTKDF_BUFFER_SIZE, 32, outbuf, 32);
 
-	//if (EndianSwap(((uint *)outbuf)[7])<= target)
+#define SCRYPT_FOUND (0xFF)
+#ifdef cl_khr_global_int32_base_atomics
+	#define SETFOUND(Xnonce) output[atomic_add(&output[SCRYPT_FOUND], 1)]= Xnonce
+#else
+	#define SETFOUND(Xnonce) output[output[SCRYPT_FOUND]++] = Xnonce
+#endif
+
 	if (((uint *)outbuf)[7]<= target)
 		SETFOUND(get_global_id(0));
 #endif
