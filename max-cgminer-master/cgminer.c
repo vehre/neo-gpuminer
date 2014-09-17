@@ -5636,9 +5636,15 @@ static void *stratum_sthread(void *userdata)
 
 		memset(nonce2, 0, 8);
 		/* We only use uint32_t sized nonce2 increments internally */
-		if(opt_neoscrypt) 
-			*((uint32_t *)nonce2)= htole32(work->nonce2);
-		else
+		if(opt_neoscrypt) {
+			if(work->nonce2_len<= 4)
+				*((uint32_t *)nonce2)= htobe32(work->nonce2);
+			else
+				/* When nonce2 is longer than 4 byte, make sure the
+				 * big endianessed nonce2 is put into the last four
+				 * byte of the nonce2-transport temporary. */
+				((uint32_t *)nonce2)[work->nonce2_len/ sizeof(uint32_t)- sizeof(uint32_t)]= htobe32(work->nonce2);
+		} else
 			memcpy(nonce2, &work->nonce2, sizeof(uint32_t));
 		__bin2hex(nonce2hex, (const unsigned char *)nonce2, work->nonce2_len);
 
