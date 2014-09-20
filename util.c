@@ -1008,10 +1008,12 @@ void cgtime(struct timeval *tv)
 #endif /* WIN32 */
 
 #ifdef CLOCK_MONOTONIC /* Essentially just linux */
+#if !(WIN32)
 void cgtimer_time(cgtimer_t *ts_start)
 {
 	clock_gettime(CLOCK_MONOTONIC, ts_start);
 }
+#endif
 
 static void nanosleep_abstime(struct timespec *ts_end)
 {
