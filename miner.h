@@ -1050,14 +1050,6 @@ extern void __bin2hex(char *s, const unsigned char *p, size_t len);
 extern char *bin2hex(const unsigned char *p, size_t len);
 extern bool hex2bin(unsigned char *p, const char *hexstr, size_t len);
 
-typedef bool (*sha256_func)(struct thr_info*, const unsigned char *pmidstate,
-	unsigned char *pdata,
-	unsigned char *phash1, unsigned char *phash,
-	const unsigned char *ptarget,
-	uint32_t max_nonce,
-	uint32_t *last_nonce,
-	uint32_t nonce);
-
 extern bool fulltest(const unsigned char *hash, const unsigned char *target);
 
 extern int opt_queue;
@@ -1389,7 +1381,6 @@ struct pool {
 
 struct work {
 	unsigned char	data[128];
-	unsigned char	midstate[32];
 	unsigned char	target[32];
 	unsigned char	hash[32];
 
@@ -1500,12 +1491,8 @@ extern bool submit_noffset_nonce(struct thr_info *thr, struct work *work, uint32
 			  int noffset);
 extern struct work *get_work(struct thr_info *thr, const int thr_id);
 extern struct work *get_queued(struct cgpu_info *cgpu);
-extern struct work *__find_work_bymidstate(struct work *que, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen);
-extern struct work *find_queued_work_bymidstate(struct cgpu_info *cgpu, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen);
-extern struct work *clone_queued_work_bymidstate(struct cgpu_info *cgpu, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen);
 extern void __work_completed(struct cgpu_info *cgpu, struct work *work);
 extern void work_completed(struct cgpu_info *cgpu, struct work *work);
-extern struct work *take_queued_work_bymidstate(struct cgpu_info *cgpu, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen);
 extern void hash_driver_work(struct thr_info *mythr);
 extern void hash_queued_work(struct thr_info *mythr);
 extern void _wlog(const char *str);
