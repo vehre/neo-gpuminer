@@ -371,8 +371,14 @@ json_t *json_rpc_call(CURL *curl, const char *url,
 
 	headers = curl_slist_append(headers,
 		"Content-type: application/json");
-	headers = curl_slist_append(headers,
-		"X-Mining-Extensions: longpoll midstate rollntime submitold");
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt)
+		headers = curl_slist_append(headers,
+			"X-Mining-Extensions: longpoll rollntime submitold");
+	else
+#endif
+		headers = curl_slist_append(headers,
+			"X-Mining-Extensions: longpoll midstate rollntime submitold");
 
 	if (likely(global_hashrate)) {
 		char ghashrate[255];

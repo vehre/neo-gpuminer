@@ -62,7 +62,9 @@ if HAS_SCRYPT
 cgminer_SOURCES += scrypt.c scrypt.h
 endif
 
+if HAS_NEOSCRYPT
 cgminer_SOURCES += neoscrypt.c neoscrypt.h
+endif
 
 if HAS_KECCAK
 cgminer_SOURCES += keccak.c keccak.h

@@ -1948,7 +1948,8 @@ static void gen_gbt_work(struct pool *pool, struct work *work)
 		free(header);
 	}
 
-	calc_midstate(work);
+	if(!opt_neoscrypt)
+		calc_midstate(work);
 	local_work++;
 	work->pool = pool;
 	work->gbt = true;
@@ -2056,18 +2057,22 @@ static bool gbt_decode(struct pool *pool, json_t *res_val)
 
 static bool getwork_decode(json_t *res_val, struct work *work)
 {
-	if (unlikely(!jobj_binary(res_val, "data", work->data, sizeof(work->data), true))) {
+	if (unlikely(!jobj_binary(res_val, "data", work->data,
+							  (opt_neoscrypt|| opt_scrypt)? 80: sizeof(work->data), true))) {
 		applog(LOG_ERR, "JSON inval data");
 		return false;
 	}
 
-	if (!jobj_binary(res_val, "midstate", work->midstate, sizeof(work->midstate), false)) {
-		// Calculate it ourselves
-		applog(LOG_DEBUG, "Calculating midstate locally");
-		calc_midstate(work);
-	}
+	if(!opt_neoscrypt)
+		/* Neoscrypt does not use midstate. */
+		if (!jobj_binary(res_val, "midstate", work->midstate, sizeof(work->midstate), false)) {
+			// Calculate it ourselves
+			applog(LOG_DEBUG, "Calculating midstate locally");
+			calc_midstate(work);
+		}
 
-	if (unlikely(!jobj_binary(res_val, "target", work->target, sizeof(work->target), true))) {
+	if (unlikely(!jobj_binary(res_val, "target", work->target,
+							  (opt_neoscrypt|| opt_scrypt)? 32: sizeof(work->target), true))) {
 		applog(LOG_ERR, "JSON invalid target");
 		return false;
 	}
@@ -2759,7 +2764,7 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 #ifdef USE_KECCAK
 	hexstr = bin2hex(work->data, /*opt_keccak ? 80 : */sizeof(work->data));
 #else
-	hexstr = bin2hex(work->data, sizeof(work->data));
+	hexstr = bin2hex(work->data, (opt_neoscrypt|| opt_scrypt)? 80: sizeof(work->data));
 #endif
 
 	/* build JSON-RPC request */
@@ -3253,11 +3258,11 @@ static void kill_mining(void)
 		if (thr && PTH(thr) != 0L)
 			pth = &thr->pth;
 		thr_info_cancel(thr);
-#ifndef WIN32
-		if (pth && *pth)
+#if defined(WIN32) && !defined(_WIN64)
+		if (pth && pth->p)
 			pthread_join(*pth, NULL);
 #else
-		if (pth && pth->p)
+		if (pth && *pth)
 			pthread_join(*pth, NULL);
 #endif
 	}

@@ -130,7 +130,7 @@ int clDevicesNum(void) {
 			continue;
 		}
 		applog(LOG_INFO, "Platform %d devices: %d", i, numDevices);
-		applog(LOG_INFO, "Device no. | device name          | OpenCL version");
+		applog(LOG_INFO, "Device no. | device name          | byte_addr. | atomic | OpenCL version");
 		if ((int)numDevices > most_devices) {
 			most_devices = numDevices;
 			mdplatform = i;
@@ -139,12 +139,17 @@ int clDevicesNum(void) {
 			unsigned int j;
 			cl_device_id *devices = (cl_device_id *)malloc(numDevices*sizeof(cl_device_id));
 			char clvbuff[1024];
+			char extensions[2048];
+			char *find;
 
 			clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
 			for (j = 0; j < numDevices; j++) {
 				clGetDeviceInfo(devices[j], CL_DEVICE_NAME, sizeof(pbuff), pbuff, NULL);
 				clGetDeviceInfo(devices[j], CL_DEVICE_VERSION, sizeof(clvbuff), clvbuff, NULL);
-				applog(LOG_INFO, "   % 3i     | %-20s | %s", j, pbuff, clvbuff);
+				clGetDeviceInfo(devices[j], CL_DEVICE_EXTENSIONS, 2048, (void *)extensions, NULL);
+				applog(LOG_INFO, "   % 3i     | %-20s |   %3s      |   %3s  | %s", j, pbuff,
+					   strstr(extensions, "cl_khr_byte_addressable_store")== 0? "NO!": "yes",
+					   strstr(extensions, "cl_khr_global_int32_base_atomics")== 0? "NO!": "yes", clvbuff);
 			}
 			free(devices);
 		}
@@ -354,6 +359,24 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		hasPrintf= true;
 		applog(LOG_DEBUG, "GPU %d has printf_debug extension.", gpu);
 	}
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt) {
+		/* Check for byte addressable store. */
+		find= strstr(extensions, "cl_khr_byte_addressable_store");
+		if(find== 0)
+			applog(LOG_WARNING, "GPU %d does not have byte addressable storage extension. "\
+				   "This may lead to a lot HW errors.", gpu);
+		else if(opt_debug)
+			applog(LOG_DEBUG, "GPU %d has byte_addressable_store extension.", gpu);
+		/* Check for global atomic extension. */
+		find= strstr(extensions, "cl_khr_global_int32_base_atomics");
+		if(find== 0)
+			applog(LOG_WARNING, "GPU %d does not have global int32 base atomics extension. "\
+				   "This may lead to a lot HW errors.", gpu);
+		else if(opt_debug)
+			applog(LOG_DEBUG, "GPU %d has global_int32_base_atomics extension.", gpu);
+	}
+#endif
 		
 	/* Check for OpenCL >= 1.0 support, needed for global offset parameter usage. */
 	char *devoclver= malloc(1024);
