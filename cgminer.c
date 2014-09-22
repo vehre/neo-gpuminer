@@ -1734,19 +1734,6 @@ static bool jobj_binary(const json_t *obj, const char *key,
 }
 #endif
 
-static void calc_midstate(struct work *work)
-{
-	unsigned char data[64];
-	uint32_t *data32 = (uint32_t *)data;
-	sha256_ctx ctx;
-
-	flip64(data32, work->data);
-	sha256_init(&ctx);
-	sha256_update(&ctx, data, 64);
-	memcpy(work->midstate, ctx.h, 32);
-	endian_flip32(work->midstate, work->midstate);
-}
-
 static struct work *make_work(void)
 {
 	struct work *work = calloc(1, sizeof(struct work));
@@ -1948,7 +1935,6 @@ static void gen_gbt_work(struct pool *pool, struct work *work)
 		free(header);
 	}
 
-	calc_midstate(work);
 	local_work++;
 	work->pool = pool;
 	work->gbt = true;
@@ -2056,18 +2042,13 @@ static bool gbt_decode(struct pool *pool, json_t *res_val)
 
 static bool getwork_decode(json_t *res_val, struct work *work)
 {
-	if (unlikely(!jobj_binary(res_val, "data", work->data, sizeof(work->data), true))) {
+
+	if (unlikely(!jobj_binary(res_val, "data", work->data, 80, true))) {
 		applog(LOG_ERR, "JSON inval data");
 		return false;
 	}
 
-	if (!jobj_binary(res_val, "midstate", work->midstate, sizeof(work->midstate), false)) {
-		// Calculate it ourselves
-		applog(LOG_DEBUG, "Calculating midstate locally");
-		calc_midstate(work);
-	}
-
-	if (unlikely(!jobj_binary(res_val, "target", work->target, sizeof(work->target), true))) {
+	if (unlikely(!jobj_binary(res_val, "target", work->target, 32, true))) {
 		applog(LOG_ERR, "JSON invalid target");
 		return false;
 	}
@@ -2755,9 +2736,9 @@ static bool submit_upstream_work(struct work *work, CURL *curl, bool resubmit)
 
 	endian_flip128(work->data, work->data);
 
-	/* build hex string */
-#ifdef USE_KECCAK
-	hexstr = bin2hex(work->data, /*opt_keccak ? 80 : */sizeof(work->data));
+#ifdef USE_NEOSCRYPT
+        /* Convert binary to hexadecimal string */
+        hexstr = bin2hex(work->data, 80);
 #else
 	hexstr = bin2hex(work->data, sizeof(work->data));
 #endif
@@ -3253,13 +3234,8 @@ static void kill_mining(void)
 		if (thr && PTH(thr) != 0L)
 			pth = &thr->pth;
 		thr_info_cancel(thr);
-#ifndef WIN32
 		if (pth && *pth)
 			pthread_join(*pth, NULL);
-#else
-		if (pth && pth->p)
-			pthread_join(*pth, NULL);
-#endif
 	}
 }
 
@@ -6180,7 +6156,7 @@ static void gen_stratum_work(struct pool *pool, struct work *work)
 #ifdef USE_NEOSCRYPT
 	if(!opt_neoscrypt)
 #endif
-		calc_midstate(work);
+
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt)
 		set_target_neoscrypt(work->target, work->sdiff);
@@ -6626,54 +6602,6 @@ struct work *get_queued(struct cgpu_info *cgpu)
 	return work;
 }
 
-/* This function is for finding an already queued work item in the
- * given que hashtable. Code using this function must be able
- * to handle NULL as a return which implies there is no matching work.
- * The calling function must lock access to the que if it is required.
- * The common values for midstatelen, offset, datalen are 32, 64, 12 */
-struct work *__find_work_bymidstate(struct work *que, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen)
-{
-	struct work *work, *tmp, *ret = NULL;
-
-	HASH_ITER(hh, que, work, tmp) {
-		if (memcmp(work->midstate, midstate, midstatelen) == 0 &&
-		    memcmp(work->data + offset, data, datalen) == 0) {
-			ret = work;
-			break;
-		}
-	}
-
-	return ret;
-}
-
-/* This function is for finding an already queued work item in the
- * device's queued_work hashtable. Code using this function must be able
- * to handle NULL as a return which implies there is no matching work.
- * The common values for midstatelen, offset, datalen are 32, 64, 12 */
-struct work *find_queued_work_bymidstate(struct cgpu_info *cgpu, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen)
-{
-	struct work *ret;
-
-	rd_lock(&cgpu->qlock);
-	ret = __find_work_bymidstate(cgpu->queued_work, midstate, midstatelen, data, offset, datalen);
-	rd_unlock(&cgpu->qlock);
-
-	return ret;
-}
-
-struct work *clone_queued_work_bymidstate(struct cgpu_info *cgpu, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen)
-{
-	struct work *work, *ret = NULL;
-
-	rd_lock(&cgpu->qlock);
-	work = __find_work_bymidstate(cgpu->queued_work, midstate, midstatelen, data, offset, datalen);
-	if (work)
-		ret = copy_work(work);
-	rd_unlock(&cgpu->qlock);
-
-	return ret;
-}
-
 void __work_completed(struct cgpu_info *cgpu, struct work *work)
 {
 	cgpu->queued_count--;
@@ -6688,21 +6616,6 @@ void work_completed(struct cgpu_info *cgpu, struct work *work)
 	wr_unlock(&cgpu->qlock);
 
 	free_work(work);
-}
-
-/* Combines find_queued_work_bymidstate and work_completed in one function
- * withOUT destroying the work so the driver must free it. */
-struct work *take_queued_work_bymidstate(struct cgpu_info *cgpu, char *midstate, size_t midstatelen, char *data, int offset, size_t datalen)
-{
-	struct work *work;
-
-	wr_lock(&cgpu->qlock);
-	work = __find_work_bymidstate(cgpu->queued_work, midstate, midstatelen, data, offset, datalen);
-	if (work)
-		__work_completed(cgpu, work);
-	wr_unlock(&cgpu->qlock);
-
-	return work;
 }
 
 static void flush_queue(struct cgpu_info *cgpu)

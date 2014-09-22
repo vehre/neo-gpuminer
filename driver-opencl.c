@@ -1102,7 +1102,6 @@ static cl_int queue_diablo_kernel(_clState *clState, dev_blk_ctx *blk, cl_uint t
 #ifdef USE_SCRYPT
 static cl_int queue_scrypt_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_unused cl_uint threads)
 {
-	unsigned char *midstate = blk->work->midstate;
 	cl_kernel *kernel = &clState->kernel;
 	unsigned int num = 0;
 	cl_uint le_target;
@@ -1115,8 +1114,6 @@ static cl_int queue_scrypt_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_u
 	CL_SET_ARG(clState->CLbuffer0);
 	CL_SET_ARG(clState->outputBuffer);
 	CL_SET_ARG(clState->padbuffer8);
-	CL_SET_VARG(4, &midstate[0]);
-	CL_SET_VARG(4, &midstate[16]);
 	CL_SET_ARG(le_target);
 
 	return status;
@@ -1143,7 +1140,6 @@ static cl_int queue_keccak_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_u
 #ifdef USE_NEOSCRYPT
 static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_unused cl_uint threads)
 {
-	//unsigned char *midstate = blk->work->midstate;
 	cl_kernel *kernel = &clState->kernel;
 	unsigned int num = 0;
 	cl_uint le_target;
@@ -1587,19 +1583,15 @@ static bool opencl_prepare_work(struct thr_info __maybe_unused *thr, struct work
 #ifdef USE_SCRYPT
 	if (opt_scrypt)
 		work->blk.work = work;
-	else
 #endif
 #ifdef USE_NEOSCRYPT
 	if (opt_neoscrypt)
 		work->blk.work = work;
-	else
 #endif
 #ifdef USE_KECCAK
 	if (opt_keccak)
 		keccak_prepare_work(thr, work);
-	else
 #endif
-		precalc_hash(&work->blk, (uint32_t *)(work->midstate), (uint32_t *)(work->data + 64));
 	return true;
 }
 

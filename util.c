@@ -372,7 +372,7 @@ json_t *json_rpc_call(CURL *curl, const char *url,
 	headers = curl_slist_append(headers,
 		"Content-type: application/json");
 	headers = curl_slist_append(headers,
-		"X-Mining-Extensions: longpoll midstate rollntime submitold");
+		"X-Mining-Extensions: longpoll rollntime submitold");
 
 	if (likely(global_hashrate)) {
 		char ghashrate[255];
@@ -600,7 +600,7 @@ void __bin2hex(char *s, const unsigned char *p, size_t len)
 	char *it= s;
 
 	for (i = 0; i < (int)len; ++i, it+= 2)
-		sprintf(it, "%02x", (unsigned int)p[i]);
+		sprintf(it, "%02X", (unsigned int)p[i]);
 
 }
 
@@ -654,9 +654,7 @@ bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
 		len--;
 	}
 
-	if (likely(len == 0 && *hexstr == 0))
-		ret = true;
-	return ret;
+	return(!len) ? true : false;
 }
 
 bool fulltest(const unsigned char *hash, const unsigned char *target)
@@ -1010,10 +1008,12 @@ void cgtime(struct timeval *tv)
 #endif /* WIN32 */
 
 #ifdef CLOCK_MONOTONIC /* Essentially just linux */
+#if !(WIN32)
 void cgtimer_time(cgtimer_t *ts_start)
 {
 	clock_gettime(CLOCK_MONOTONIC, ts_start);
 }
+#endif
 
 static void nanosleep_abstime(struct timespec *ts_end)
 {
