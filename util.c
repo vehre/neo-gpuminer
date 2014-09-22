@@ -660,9 +660,10 @@ bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
 		len--;
 	}
 
-	if (likely(len == 0 && *hexstr == 0))
-		ret = true;
-	return ret;
+	if(opt_neoscrypt)
+		return len== 0;
+	else
+		return likely(len == 0 && *hexstr == 0);
 }
 
 bool fulltest(const unsigned char *hash, const unsigned char *target)
@@ -681,8 +682,8 @@ bool fulltest(const unsigned char *hash, const unsigned char *target)
 	for (i = 0; i < 32/4; i++) {
 #ifdef USE_NEOSCRYPT
 		if(opt_neoscrypt) {
-			h32tmp = htole32(hash32[i]);
-			t32tmp = htobe32(target32[i]);
+			h32tmp = le32toh(hash32[i]);
+			t32tmp = le32toh(target32[i]);
 			hash32[i]= swab32(hash32[i]); /* for printing */
 		} else
 #endif

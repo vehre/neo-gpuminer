@@ -2058,7 +2058,7 @@ static bool gbt_decode(struct pool *pool, json_t *res_val)
 static bool getwork_decode(json_t *res_val, struct work *work)
 {
 	if (unlikely(!jobj_binary(res_val, "data", work->data,
-							  (opt_neoscrypt|| opt_scrypt)? 80: sizeof(work->data), true))) {
+							  /*(opt_neoscrypt|| opt_scrypt)? 80: */sizeof(work->data), true))) {
 		applog(LOG_ERR, "JSON inval data");
 		return false;
 	}
@@ -2072,7 +2072,7 @@ static bool getwork_decode(json_t *res_val, struct work *work)
 		}
 
 	if (unlikely(!jobj_binary(res_val, "target", work->target,
-							  (opt_neoscrypt|| opt_scrypt)? 32: sizeof(work->target), true))) {
+							  /*(opt_neoscrypt|| opt_scrypt)? 32: */sizeof(work->target), true))) {
 		applog(LOG_ERR, "JSON invalid target");
 		return false;
 	}
@@ -6298,7 +6298,7 @@ bool test_nonce(struct work *work, uint32_t nonce)
 
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt) {
-		diff1targ= ((uint32_t *)work->target)[7];
+		diff1targ= le32toh(((uint32_t *)work->target)[7]);
 		memcpy(work->hash2, work->hash, 8* sizeof(uint32_t));
 		bool rc= hash2_32[7]<= diff1targ;
 		if(!rc&& opt_debug)

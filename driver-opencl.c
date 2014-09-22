@@ -1153,7 +1153,7 @@ static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __mayb
 	 * the target's most significant entry is adressed as a 32-bit value
 	 * and not accidently by something else the double cast seems wise.
 	 * The compiler will get rid of it anyway. */
-	le_target = (cl_uint)((uint32_t *)blk->work->device_target)[7];
+	le_target = (cl_uint)le32toh(((uint32_t *)blk->work->/*device_*/target)[7]);
 	clState->cldata = blk->work->data;
 	status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 80, clState->cldata, 0, NULL,NULL);
 
