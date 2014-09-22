@@ -4428,33 +4428,37 @@ void write_config(FILE *fcfg)
 		for(i = 0; i < nDevs; i++)
 			fprintf(fcfg, "%s%d", i > 0 ? "," : "",
 				(int)gpus[i].work_size);
-		fputs("\",\n\"kernel\" : \"", fcfg);
-		for(i = 0; i < nDevs; i++) {
-			fprintf(fcfg, "%s", i > 0 ? "," : "");
-			switch (gpus[i].kernel) {
-				case KL_NONE: // Shouldn't happen
-					break;
-				case KL_POCLBM:
-					fprintf(fcfg, "poclbm");
-					break;
-				case KL_PHATK:
-					fprintf(fcfg, "phatk");
-					break;
-				case KL_DIAKGCN:
-					fprintf(fcfg, "diakgcn");
-					break;
-				case KL_DIABLO:
-					fprintf(fcfg, "diablo");
-					break;
-				case KL_SCRYPT:
-					fprintf(fcfg, "scrypt");
-					break;
-				case KL_NEOSCRYPT:
-					fprintf(fcfg, "neoscrypt");
-					break;
-				case KL_KECCAK:
-					fprintf(fcfg, "keccak");
-					break;
+		/* Write the kernel config opt only, when not neoscrypt and not scrypt. */
+		if(!opt_neoscrypt&& !opt_scrypt) {
+			fputs("\",\n\"kernel\" : \"", fcfg);
+			for(i = 0; i < nDevs; i++) {
+				fprintf(fcfg, "%s", i > 0 ? "," : "");
+				switch (gpus[i].kernel) {
+					case KL_NONE: // Shouldn't happen
+						break;
+					case KL_POCLBM:
+						fprintf(fcfg, "poclbm");
+						break;
+					case KL_PHATK:
+						fprintf(fcfg, "phatk");
+						break;
+					case KL_DIAKGCN:
+						fprintf(fcfg, "diakgcn");
+						break;
+					case KL_DIABLO:
+						fprintf(fcfg, "diablo");
+						break;
+// Can't be selected this way.
+//					case KL_SCRYPT:
+//						fprintf(fcfg, "scrypt");
+//						break;
+//					case KL_NEOSCRYPT:
+//						fprintf(fcfg, "neoscrypt");
+//						break;
+					case KL_KECCAK:
+						fprintf(fcfg, "keccak");
+						break;
+				}
 			}
 		}
 #ifdef USE_SCRYPT
