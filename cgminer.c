@@ -3139,12 +3139,13 @@ static void calc_diff(struct work *work, int known)
 #endif
 #ifdef USE_NEOSCRYPT
 	if (opt_neoscrypt) {
-		uint64_t *data64, d64;
+		/*uint64_t *data64, d64;
 		char rtarget[32];
 
 		swab256(rtarget, work->target);
 		data64 = (uint64_t *)(rtarget + 2);
-		d64 = be64toh(*data64);
+		d64 = be64toh(*data64);*/
+		uint64_t d64= *((uint64_t *)(work->target+ 22));
 		if (unlikely(!d64))
 			d64 = 1;
 		work->work_difficulty = diffone / d64;
@@ -6293,11 +6294,15 @@ bool test_nonce(struct work *work, uint32_t nonce)
 
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt) {
-		diff1targ= le32toh(((uint32_t *)work->target)[7]);
+		/* The target is already in this systems endianess. No need to swap here. */
+		diff1targ= ((uint32_t *)work->target)[7];
 		memcpy(work->hash2, work->hash, 8* sizeof(uint32_t));
-		bool rc= hash2_32[7]<= diff1targ;
+		/* Just make sure, that on systems having big endianess and a graphic
+		 * card using little endianess the gracard's value is transformed
+		 * correctly. */
+		bool rc= le32toh(hash2_32[7])<= diff1targ;
 		if(!rc&& opt_debug)
-			applog(LOG_DEBUG, "(Hash[7]= %u)> (target[7]= %u)", hash2_32[7], diff1targ);
+			applog(LOG_DEBUG, "(Hash[7]= %u)> (target[7]= %u)", le32toh(hash2_32[7]), diff1targ);
 		return rc;
 	} else
 #endif
