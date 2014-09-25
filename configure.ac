@@ -233,13 +233,6 @@ dlneeded="unknown"
 if test "$found_opencl" = 1; then
 	if test "x$adl" != xno; then
 		dnl Fixing ADL_SDK headers on Linux
-		if test x$have_linux = xtrue ; then
-			ADL_CPPFLAGS="$ADL_CPPFLAGS -DLINUX"
-			SAVE_CPPFLAGS="$CPPFLAGS"
-			CPPFLAGS="$ADL_CPPFLAGS"
-		else
-			ADL_CPPFLAGS=
-		fi
 		if test "x$ADL_SDK_DIR" = x ; then
 			if test "x$srcdir" = x. ; then
 				ADL_SDK_DIR=$(cd -P -- "$(dirname -- "$srcdir")" && printf '%s\n' "$(pwd -P)")
@@ -247,10 +240,13 @@ if test "$found_opencl" = 1; then
 				ADL_SDK_DIR=$(cd -P -- "$(dirname -- "$srcdir")" && printf '%s\n' "$(pwd -P)/$(basename -- "$srcdir")")
 			fi
 		fi
-		AC_CHECK_HEADERS([${ADL_SDK_DIR}/ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS="$ADL_CPPFLAGS -I${ADL_SDK_DIR}"], have_adl=false,)
 		if test x$have_linux = xtrue ; then
-			CPPFLAGS="$SAVE_CPPFLAGS"
+			ADL_CPPFLAGS="$ADL_CPPFLAGS -DLINUX"
 		fi
+		SAVE_CPPFLAGS="$CPPFLAGS"
+		CPPFLAGS="$ADL_CPPFLAGS -I$ADL_SDK_DIR"
+		AC_CHECK_HEADERS([ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS="$ADL_CPPFLAGS -I${ADL_SDK_DIR}"], have_adl=false,)
+		CPPFLAGS="$SAVE_CPPFLAGS"
 		if test x$have_adl+$have_cgminer_sdk = xfalse+true; then
 			AC_CHECK_HEADERS([$CGMINER_SDK/include/ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS=-I$CGMINER_SDK/include], have_adl=false,)
 		fi
