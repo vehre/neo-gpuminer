@@ -241,7 +241,11 @@ if test "$found_opencl" = 1; then
 			ADL_CPPFLAGS=
 		fi
 		if test "x$ADL_SDK_DIR" = x ; then
-			ADL_SDK_DIR=$(cd -P -- "$(dirname -- "$srcdir")" && printf '%s\n' "$(pwd -P)/$(basename -- "$srcdir")")
+			if test "x$srcdir" = x. ; then
+				ADL_SDK_DIR=$(cd -P -- "$(dirname -- "$srcdir")" && printf '%s\n' "$(pwd -P)")
+			else
+				ADL_SDK_DIR=$(cd -P -- "$(dirname -- "$srcdir")" && printf '%s\n' "$(pwd -P)/$(basename -- "$srcdir")")
+			fi
 		fi
 		AC_CHECK_HEADERS([${ADL_SDK_DIR}/ADL_SDK/adl_sdk.h], [have_adl=true; ADL_CPPFLAGS="$ADL_CPPFLAGS -I${ADL_SDK_DIR}"], have_adl=false,)
 		if test x$have_linux = xtrue ; then
