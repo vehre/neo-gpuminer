@@ -661,7 +661,7 @@ bool hex2bin(unsigned char *p, const char *hexstr, size_t len)
 	}
 
 	if(opt_neoscrypt)
-		return len== 0;
+		return likely(len== 0|| *hexstr== 0);
 	else
 		return likely(len == 0 && *hexstr == 0);
 }

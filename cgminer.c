@@ -2058,7 +2058,7 @@ static bool gbt_decode(struct pool *pool, json_t *res_val)
 static bool getwork_decode(json_t *res_val, struct work *work)
 {
 	if (unlikely(!jobj_binary(res_val, "data", work->data,
-							  (opt_neoscrypt|| opt_scrypt)? 84: sizeof(work->data), true))) {
+							  /*(opt_neoscrypt|| opt_scrypt)? 84: */sizeof(work->data), true))) {
 		applog(LOG_ERR, "JSON inval data");
 		return false;
 	}
