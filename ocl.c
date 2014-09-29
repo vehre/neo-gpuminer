@@ -575,11 +575,11 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt){
 		if (!cgpu->opt_tc) {
-			unsigned int sixtyfours;
-
-			sixtyfours = cgpu->max_alloc / (NEOSCRYPT_SCRATCHBUF_SIZE* 2) / 64 - 1;
-			cgpu->thread_concurrency = sixtyfours * 64;
-			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d", gpu, (int)(cgpu->thread_concurrency));
+			/* There is currently no need for a thread concurrency larger than
+			 * worksize, because no more than worksize threads are running and
+			 * selecting a larger thread concurrency just wastes that memory. */
+			cgpu->thread_concurrency= cgpu->work_size;
+			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d (defaults to worksize)", gpu, (int)(cgpu->thread_concurrency));
 		} else
 			cgpu->thread_concurrency = cgpu->opt_tc;
 	}

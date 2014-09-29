@@ -460,6 +460,15 @@ void blake2s(const void *input, const uint input_size,
 void fastkdf(const uchar *password, const uchar *salt, const uint salt_len,
 			 uint N, uchar *output, uint output_len) {
 
+	/*                    WARNING!
+	 * This algorithm uses byte-wise addressing for memory blocks.
+	 * Or in other words, trying to copy an unaligned memory region
+	 * will significantly slow down the algorithm, when copying uses
+	 * words or bigger entities. It even may corrupt the data, when
+	 * the device does not support it properly.
+	 * Therefore use byte copying, which will not the fastest but at
+	 * least get reliable results. */
+
 	// BLOCK_SIZE            64U
 	// FASTKDF_BUFFER_SIZE  256U
 	// BLAKE2S_BLOCK_SIZE    64U

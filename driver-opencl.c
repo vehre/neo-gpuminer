@@ -1427,9 +1427,7 @@ static bool opencl_thread_prepare(struct thr_info *thr)
 	int virtual_gpu = cgpu->virtual_gpu;
 	int i = thr->id;
 	static bool failmessage = false;
-	int buffersize = opt_scrypt ? SCRYPT_BUFFERSIZE : BUFFERSIZE;	
-	if (opt_neoscrypt) 
-		buffersize = opt_neoscrypt ? SCRYPT_BUFFERSIZE : BUFFERSIZE;			
+	int buffersize = (opt_scrypt|| opt_neoscrypt) ? SCRYPT_BUFFERSIZE : BUFFERSIZE;
 
 	if (!blank_res)
 		blank_res = calloc(buffersize, 1);

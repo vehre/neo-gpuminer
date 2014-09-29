@@ -1438,7 +1438,7 @@ static struct opt_table opt_config_table[] = {
 	),
 #if (defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)) && defined(HAVE_OPENCL)
 	OPT_WITH_ARG("--thread-concurrency",
-		     set_thread_concurrency, NULL, NULL,
+				 set_thread_concurrency, NULL, NULL,
 		     "Set GPU thread concurrency for (neo)scrypt mining, comma separated"),
 #endif
 	OPT_WITH_ARG("--url|-o",
@@ -2058,7 +2058,7 @@ static bool gbt_decode(struct pool *pool, json_t *res_val)
 static bool getwork_decode(json_t *res_val, struct work *work)
 {
 	if (unlikely(!jobj_binary(res_val, "data", work->data,
-							  /*(opt_neoscrypt|| opt_scrypt)? 80: */sizeof(work->data), true))) {
+							  (opt_neoscrypt|| opt_scrypt)? 84: sizeof(work->data), true))) {
 		applog(LOG_ERR, "JSON inval data");
 		return false;
 	}
@@ -2072,7 +2072,7 @@ static bool getwork_decode(json_t *res_val, struct work *work)
 		}
 
 	if (unlikely(!jobj_binary(res_val, "target", work->target,
-							  /*(opt_neoscrypt|| opt_scrypt)? 32: */sizeof(work->target), true))) {
+							  (opt_neoscrypt|| opt_scrypt)? 32: sizeof(work->target), true))) {
 		applog(LOG_ERR, "JSON invalid target");
 		return false;
 	}
