@@ -2309,7 +2309,17 @@ static void curses_print_status(void)
 	wattron(statuswin, A_BOLD);
 #ifdef USE_NEOSCRYPT
 	if (opt_neoscrypt) 
-		cg_mvwprintw(statuswin, 0, 0, " " PACKAGE " version " VERSION " - Feathercoin Neoscrypt - Started: %s", datestamp);
+		cg_mvwprintw(statuswin, 0, 0, " " PACKAGE " version " VERSION " - Neoscrypt - Started: %s", datestamp);
+	else
+#endif
+#ifdef USE_SCRYPT
+	if (opt_scrypt)
+		cg_mvwprintw(statuswin, 0, 0, " " PACKAGE " version " VERSION " - Scrypt - Started: %s", datestamp);
+	else
+#endif
+#ifdef USE_KECCAK
+	if (opt_keccak)
+		cg_mvwprintw(statuswin, 0, 0, " " PACKAGE " version " VERSION " - Keccak - Started: %s", datestamp);
 	else
 #endif
 		cg_mvwprintw(statuswin, 0, 0, " " PACKAGE " version " VERSION " - Started: %s", datestamp);

@@ -663,7 +663,7 @@ __kernel void search(__global const uchar* restrict input,
 	uchar Z[FASTKDF_BUFFER_SIZE];
 	/* V = CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE */
 	__global uchar *V= &padcache[CONSTANT_N * CONSTANT_r * 2 * BLOCK_SIZE*
-		(get_global_id(0)% CONCURRENT_THREADS)];
+		(get_global_id(0)% WORKGROUPSIZE)];
 #ifndef TEST
 	uchar outbuf[32];
 	uchar data[PASSWORD_LEN];
