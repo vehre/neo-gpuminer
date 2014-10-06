@@ -1176,9 +1176,6 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITH_ARG("--gpu-threads|-g",
 		     set_int_1_to_10, opt_show_intval, &opt_g_threads,
 		     "Number of threads per GPU (1 - 10)"),
-	OPT_WITHOUT_ARG("--opencl-all-devices",
-		     opt_set_bool, &opt_all_cldevices,
-		     "Enable opencl-computing on all devices (default is only on gpus)"),
 #ifdef HAVE_ADL
 	OPT_WITH_ARG("--gpu-engine",
 		     set_gpu_engine, NULL, NULL,
@@ -1213,7 +1210,7 @@ static struct opt_table opt_config_table[] = {
 #if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
 	OPT_WITH_ARG("--intensity|-I",
 		     set_intensity, NULL, NULL,
-		     "Intensity of GPU scanning (d or " MIN_SHA_INTENSITY_STR
+		     "Intensity of GPU scanning (d or " MIN_SCRYPT_INTENSITY_STR
 		     " -> " MAX_SCRYPT_INTENSITY_STR
 		     ",default: d to maintain desktop interactivity)"),
 #else
@@ -1333,6 +1330,11 @@ static struct opt_table opt_config_table[] = {
 	OPT_WITHOUT_ARG("--no-submit-stale",
 			opt_set_invbool, &opt_submit_stale,
 		        "Don't submit shares if they are detected as stale"),
+#ifdef HAVE_OPENCL
+	OPT_WITHOUT_ARG("--opencl-all-devices",
+		     opt_set_bool, &opt_all_cldevices,
+		     "Enable opencl-computing on all devices (default is only on gpus)"),
+#endif
 	OPT_WITH_ARG("--pass|-p",
 		     set_pass, NULL, NULL,
 		     "Password for bitcoin JSON-RPC server"),
@@ -1436,10 +1438,10 @@ static struct opt_table opt_config_table[] = {
 			opt_hidden
 #endif
 	),
-#if (defined(USE_SCRYPT)|| defined(USE_NEOSCRYPT)) && defined(HAVE_OPENCL)
+#if defined(USE_SCRYPT) && defined(HAVE_OPENCL)
 	OPT_WITH_ARG("--thread-concurrency",
 				 set_thread_concurrency, NULL, NULL,
-		     "Set GPU thread concurrency for (neo)scrypt mining, comma separated"),
+		     "Set GPU thread concurrency for scrypt mining, comma separated"),
 #endif
 	OPT_WITH_ARG("--url|-o",
 		     set_url, NULL, NULL,
@@ -4487,11 +4489,13 @@ void write_config(FILE *fcfg)
 			fprintf(fcfg, "%s%d", i > 0 ? "," : "",
 				(int)gpus[i].shaders);
 #endif
-#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
-		fputs("\",\n\"thread-concurrency\" : \"", fcfg);
-		for(i = 0; i < nDevs; i++)
-			fprintf(fcfg, "%s%d", i > 0 ? "," : "",
-				(int)gpus[i].opt_tc);
+#if defined(USE_SCRYPT)
+		if(!opt_neoscrypt) {
+			fputs("\",\n\"thread-concurrency\" : \"", fcfg);
+			for(i = 0; i < nDevs; i++)
+				fprintf(fcfg, "%s%d", i > 0 ? "," : "",
+					(int)gpus[i].opt_tc);
+		}
 #endif
 #ifdef HAVE_ADL
 		fputs("\",\n\"gpu-engine\" : \"", fcfg);
@@ -5259,7 +5263,7 @@ static void stratum_share_result(json_t *val, json_t *res_val, json_t *err_val,
 	int intdiff;
 
 	hash32 = (uint32_t *)(work->hash);
-	intdiff = floor(work->work_difficulty);
+	intdiff = work->work_difficulty<= (double)INT_MAX? floor(work->work_difficulty): 1;
 	suffix_string(work->share_diff, diffdisp, sizeof (diffdisp), 0);
 	snprintf(hashshow, sizeof(hashshow),
 		"%08lx Diff %s/%d%s", (unsigned long)htole32(hash32[6]), diffdisp, intdiff,

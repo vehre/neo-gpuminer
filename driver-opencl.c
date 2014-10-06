@@ -187,7 +187,7 @@ char *set_lookup_gap(char *arg)
 }
 #endif
 
-#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
+#if defined(USE_SCRYPT)
 char *set_thread_concurrency(char *arg)
 {
 	int i, val = 0, device = 0;
@@ -1143,7 +1143,6 @@ static cl_int queue_keccak_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_u
 #ifdef USE_NEOSCRYPT
 static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __maybe_unused cl_uint threads)
 {
-	//unsigned char *midstate = blk->work->midstate;
 	cl_kernel *kernel = &clState->kernel;
 	unsigned int num = 0;
 	cl_uint le_target;
@@ -1155,7 +1154,8 @@ static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __mayb
 	 * The compiler will get rid of it anyway. */
 	le_target = (cl_uint)le32toh(((uint32_t *)blk->work->/*device_*/target)[7]);
 	clState->cldata = blk->work->data;
-	status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true, 0, 80, clState->cldata, 0, NULL,NULL);
+	status = clEnqueueWriteBuffer(clState->commandQueue, clState->CLbuffer0, true,
+								  0, 80, clState->cldata, 0, NULL,NULL);
 
 	CL_SET_ARG(clState->CLbuffer0);
 	CL_SET_ARG(clState->outputBuffer);
@@ -1165,15 +1165,17 @@ static cl_int queue_neoscrypt_kernel(_clState *clState, dev_blk_ctx *blk, __mayb
 	return status;
 }
 #endif
-static void set_threads_hashes(unsigned int vectors,int64_t *hashes, size_t *globalThreads,
+static void set_threads_hashes(unsigned int vectors,uint64_t *hashes, size_t *globalThreads,
 			       unsigned int minthreads, __maybe_unused int *intensity)
 {
 	unsigned int threads = 0;
 
 	while (threads < minthreads) {
-		if (opt_scrypt || opt_neoscrypt) {
+		if (opt_scrypt || opt_neoscrypt)
 			threads = 1 << *intensity;
-		}
+		else
+			threads = 1 << (15 + *intensity);
+
 		if (threads < minthreads) {
 			if (likely(*intensity < MAX_INTENSITY))
 				(*intensity)++;
@@ -1616,7 +1618,7 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
 	cl_int status;
 	size_t globalThreads[1];
 	size_t localThreads[1] = { clState->wsize };
-	int64_t hashes;
+	uint64_t hashes;
 	int found = (opt_scrypt|| opt_neoscrypt) ? SCRYPT_FOUND : FOUND;
 	int buffersize = (opt_scrypt|| opt_neoscrypt) ? SCRYPT_BUFFERSIZE : BUFFERSIZE;
 
@@ -1642,6 +1644,8 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
 	if (hashes > gpu->max_hashes)
 		gpu->max_hashes = hashes;
 
+	applog(LOG_DEBUG, "GPU %d: global threads %d, local threads %d", thr_id,
+		   globalThreads[0], localThreads[0]);
 	status = thrdata->queue_kernel_parameters(clState, &work->blk, globalThreads[0]);
 	if (unlikely(status != CL_SUCCESS)) {
 		applog(LOG_ERR, "Error: clSetKernelArg of all params failed.");
@@ -1672,7 +1676,7 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
 	/* The amount of work scanned can fluctuate when intensity changes
 	 * and since we do this one cycle behind, we increment the work more
 	 * than enough to prevent repeating work */
-	work->blk.nonce += gpu->max_hashes;
+	work->blk.nonce += (opt_neoscrypt? hashes: gpu->max_hashes);
 
 	/* This finish flushes the readbuffer set with CL_FALSE in clEnqueueReadBuffer */
 	clFinish(clState->commandQueue);

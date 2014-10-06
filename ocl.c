@@ -432,6 +432,8 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	 * name + kernelname +/- g(offset) + v + vectors + w + work_size + l + sizeof(long) + .bin
 	 * For scrypt the filename is:
 	 * name + kernelname + g + lg + lookup_gap + tc + thread_concurrency + w + work_size + l + sizeof(long) + .bin
+	 * For neoscrypt the filename is:
+	 * name + kernelname + w + work_size + l + sizeof(long) + .bin
 	 */
 	char binaryfilename[255];
 	char filename[255];
@@ -572,18 +574,22 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 			cgpu->thread_concurrency = cgpu->opt_tc;
 	}
 #endif
-#ifdef USE_NEOSCRYPT
-	if(opt_neoscrypt){
-		if (!cgpu->opt_tc) {
-			/* There is currently no need for a thread concurrency larger than
-			 * worksize, because no more than worksize threads are running and
-			 * selecting a larger thread concurrency just wastes that memory. */
-			cgpu->thread_concurrency= cgpu->work_size;
-			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d (defaults to worksize)", gpu, (int)(cgpu->thread_concurrency));
-		} else
-			cgpu->thread_concurrency = cgpu->opt_tc;
-	}
-#endif
+//#ifdef USE_NEOSCRYPT
+//	if(opt_neoscrypt){
+//		if (!cgpu->opt_tc) {
+//			/* There is currently no need for a thread concurrency larger than
+//			 * worksize, because no more than worksize threads are running and
+//			 * selecting a larger thread concurrency just wastes that memory. */
+//			cgpu->thread_concurrency= cgpu->work_size;
+//			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d (defaults to worksize)", gpu, (int)(cgpu->thread_concurrency));
+//		} else {
+//			if (cgpu->opt_tc< cgpu->work_size)
+//				applog(LOG_WARNING, "GPU %d: thread-concurrency (%d) must be greater of equal to the worksize (%d)",
+//					   gpu, cgpu->opt_tc, cgpu->work_size);
+//			cgpu->thread_concurrency = cgpu->opt_tc;
+//		}
+//	}
+//#endif
 	FILE *binaryfile;
 	size_t *binary_sizes;
 	char **binaries;
@@ -618,10 +624,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	} else
 #endif
 #ifdef USE_NEOSCRYPT
-	if (opt_neoscrypt) {
-		sprintf(numbuf, /*"lg%u*/ "tc%u", /*cgpu->lookup_gap,*/ (unsigned int)cgpu->thread_concurrency);
-		strcat(binaryfilename, numbuf);
-	} else
+	if (!opt_neoscrypt) // Intentionally no { here to make the next block optional on neoscrypt
 #endif
 	{
 		sprintf(numbuf, "v%d", clState->vwidth);
@@ -710,8 +713,8 @@ build:
 #endif
 #if defined(USE_NEOSCRYPT)
 	if (opt_neoscrypt)
-		sprintf(CompilerOptions, "-D CONCURRENT_THREADS=%d -D WORKGROUPSIZE=%d %s",
-			(unsigned int)cgpu->thread_concurrency, (int)clState->wsize, (hasPrintf? "-g": ""));
+		sprintf(CompilerOptions, "-D WORKGROUPSIZE=%d %s",
+			(int)clState->wsize, (hasPrintf? "-g": ""));
 	else
 #endif
 	{
@@ -942,7 +945,7 @@ built:
 #ifdef USE_NEOSCRYPT
 	if (opt_neoscrypt) {
 		/* The scratch/pad-buffer needs 32kBytes memory per thread. */
-		size_t bufsize = NEOSCRYPT_SCRATCHBUF_SIZE * cgpu->thread_concurrency;
+		size_t bufsize = NEOSCRYPT_SCRATCHBUF_SIZE * cgpu->work_size;
 
 		/* Use the max alloc value which has been rounded to a power of
 		 * 2 greater >= required amount earlier */
@@ -960,11 +963,12 @@ built:
 		clState->padbuffer8 = NULL;
 		clState->padbuffer8 = clCreateBuffer(clState->context, CL_MEM_READ_WRITE, bufsize, NULL, &status);
 		if (status != CL_SUCCESS && !clState->padbuffer8) {
-			applog(LOG_ERR, "Error %d: clCreateBuffer (padbuffer8), decrease TC or increase LG", status);
+			applog(LOG_ERR, "Error %d: clCreateBuffer (padbuffer8)", status);
 			return NULL;
 		}
-
-		clState->CLbuffer0 = clCreateBuffer(clState->context, CL_MEM_READ_ONLY, 128, NULL, &status);
+		/* This is the input buffer. For neoscrypt this is guaranteed to be
+		 * 80 bytes only. */
+		clState->CLbuffer0 = clCreateBuffer(clState->context, CL_MEM_READ_ONLY, 80, NULL, &status);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: clCreateBuffer (CLbuffer0)", status);
 			return NULL;
