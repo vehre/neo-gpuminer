@@ -577,7 +577,7 @@ void fastkdf(const uchar *password, const uchar *salt, const uint salt_len,
 
 /* Configurable optimised block mixer */
 void neoscrypt_blkmix(uint *X, /*uint *Y, uint r,*/ uint mixmode) {
-    uint i, mixer, rounds;
+    uint mixer, rounds;
 
     mixer  = mixmode >> 8;
     rounds = mixmode & 0xFF;
