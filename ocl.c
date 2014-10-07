@@ -574,22 +574,30 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 			cgpu->thread_concurrency = cgpu->opt_tc;
 	}
 #endif
-//#ifdef USE_NEOSCRYPT
-//	if(opt_neoscrypt){
-//		if (!cgpu->opt_tc) {
-//			/* There is currently no need for a thread concurrency larger than
-//			 * worksize, because no more than worksize threads are running and
-//			 * selecting a larger thread concurrency just wastes that memory. */
-//			cgpu->thread_concurrency= cgpu->work_size;
-//			applog(LOG_DEBUG, "GPU %d: selecting thread concurrency of %d (defaults to worksize)", gpu, (int)(cgpu->thread_concurrency));
-//		} else {
-//			if (cgpu->opt_tc< cgpu->work_size)
-//				applog(LOG_WARNING, "GPU %d: thread-concurrency (%d) must be greater of equal to the worksize (%d)",
-//					   gpu, cgpu->opt_tc, cgpu->work_size);
-//			cgpu->thread_concurrency = cgpu->opt_tc;
-//		}
-//	}
-//#endif
+#ifdef USE_NEOSCRYPT
+	if(opt_neoscrypt){
+		cgpu->max_intensity = cgpu->dynamic? MAX_INTENSITY: cgpu->intensity;
+		size_t glob_thread_count = 1U<< cgpu->max_intensity;
+		cgpu->thread_concurrency = (glob_thread_count< cgpu->work_size ? cgpu->work_size: glob_thread_count);
+		if(cgpu->max_alloc< cgpu->thread_concurrency* NEOSCRYPT_SCRATCHBUF_SIZE) {
+			/* Selected intensity will not run on this GPU. Not enough memory.
+			 * Adapt the memory setting. */
+			glob_thread_count= cgpu->max_alloc/ NEOSCRYPT_SCRATCHBUF_SIZE;
+			/* Find highest significant bit in glob_thread_count, which gives
+			 * the intensity. */
+			while(cgpu->max_intensity&& ((1U<< cgpu->max_intensity)& glob_thread_count)== 0)
+				--cgpu->max_intensity;
+			/* Check if max_intensity is >0. */
+			if(cgpu->max_intensity< MIN_INTENSITY) {
+				applog(LOG_ERR, "GPU %d: Max intensity is below minimum.", gpu);
+				cgpu->max_intensity= MIN_INTENSITY;
+			}
+			cgpu->intensity= cgpu->max_intensity;
+			cgpu->thread_concurrency = 1U<< cgpu->max_intensity;
+		}
+		applog(LOG_DEBUG, "GPU %d: computing max. global thread count to %u", gpu, (unsigned)(cgpu->thread_concurrency));
+	}
+#endif
 	FILE *binaryfile;
 	size_t *binary_sizes;
 	char **binaries;
@@ -624,7 +632,10 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	} else
 #endif
 #ifdef USE_NEOSCRYPT
-	if (!opt_neoscrypt) // Intentionally no { here to make the next block optional on neoscrypt
+	if (opt_neoscrypt){
+		sprintf(numbuf, "mgc%u", (unsigned int)cgpu->thread_concurrency);
+		strcat(binaryfilename, numbuf);
+	} else
 #endif
 	{
 		sprintf(numbuf, "v%d", clState->vwidth);
@@ -713,8 +724,8 @@ build:
 #endif
 #if defined(USE_NEOSCRYPT)
 	if (opt_neoscrypt)
-		sprintf(CompilerOptions, "-D WORKGROUPSIZE=%d %s",
-			(int)clState->wsize, (hasPrintf? "-g": ""));
+		sprintf(CompilerOptions, "-D WORKGROUPSIZE=%d -D MAX_GLOBAL_THREADS=%u %s",
+			(int)clState->wsize, (unsigned)cgpu->thread_concurrency, (hasPrintf? "-g": ""));
 	else
 #endif
 	{
@@ -945,7 +956,7 @@ built:
 #ifdef USE_NEOSCRYPT
 	if (opt_neoscrypt) {
 		/* The scratch/pad-buffer needs 32kBytes memory per thread. */
-		size_t bufsize = NEOSCRYPT_SCRATCHBUF_SIZE * cgpu->work_size;
+		size_t bufsize = NEOSCRYPT_SCRATCHBUF_SIZE * cgpu->thread_concurrency;
 
 		/* Use the max alloc value which has been rounded to a power of
 		 * 2 greater >= required amount earlier */

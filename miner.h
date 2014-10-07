@@ -524,6 +524,9 @@ struct cgpu_info {
 	int virtual_adl;
 	int intensity;
 	bool dynamic;
+#ifdef USE_NEOSCRYPT
+	int max_intensity;
+#endif
 
 	cl_uint vwidth;
 	size_t work_size;
@@ -533,7 +536,12 @@ struct cgpu_info {
 #ifdef USE_SCRYPT
 	int opt_lg, lookup_gap;
 	size_t shaders;
-	size_t opt_tc, thread_concurrency;
+	size_t opt_tc;
+#endif
+#if defined(USE_SCRYPT) || defined(USE_NEOSCRYPT)
+	/* Neoscrypt uses this variable to store the (maximum) number of
+	 * global threads that may be in use. */
+	size_t thread_concurrency;
 #endif
 	struct timeval tv_gpustart;
 	int intervals;

@@ -1633,7 +1633,7 @@ static int64_t opencl_scanhash(struct thr_info *thr, struct work *work,
 			if (gpu->intensity > MIN_INTENSITY)
 				--gpu->intensity;
 		} else if (gpu_us < dynamic_us / 2) {
-			if (gpu->intensity < MAX_INTENSITY)
+			if (gpu->intensity < (opt_neoscrypt? gpu->max_intensity: MAX_INTENSITY))
 				++gpu->intensity;
 		}
 		memcpy(&(gpu->tv_gpustart), &tv_gpuend, sizeof(struct timeval));
