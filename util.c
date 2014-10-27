@@ -1667,7 +1667,7 @@ static bool show_message(struct pool *pool, json_t *val)
 
 bool parse_method(struct pool *pool, char *s)
 {
-	json_t *val = NULL, *method, *err_val, *params;
+	json_t *val = NULL, *method= NULL, *err_val= NULL, *params= NULL;
 	json_error_t err;
 	bool ret = false;
 	char *buf;
@@ -1686,7 +1686,7 @@ bool parse_method(struct pool *pool, char *s)
 
 	method = json_object_get(val, "method");
 	if (!method)
-		return ret;
+		goto out;
 	err_val = json_object_get(val, "error");
 	params = json_object_get(val, "params");
 
@@ -1702,46 +1702,40 @@ bool parse_method(struct pool *pool, char *s)
 
 		free(ss);
 
-		return ret;
+		goto out;
 	}
 
 	buf = (char *)json_string_value(method);
 	if (!buf)
-		return ret;
+		goto out;
 
 	if (!strncasecmp(buf, "mining.notify", 13)) {
 		if (parse_notify(pool, params))
 			pool->stratum_notify = ret = true;
 		else
 			pool->stratum_notify = ret = false;
-		return ret;
+		goto out;
 	}
 
-	if (!strncasecmp(buf, "mining.set_difficulty", 21) && parse_diff(pool, params)) {
+	if (!strncasecmp(buf, "mining.set_difficulty", 21) && parse_diff(pool, params)||
+			!strncasecmp(buf, "client.reconnect", 16) && parse_reconnect(pool, params)||
+			!strncasecmp(buf, "client.get_version", 18) && send_version(pool, val)||
+			!strncasecmp(buf, "client.show_message", 19) && show_message(pool, params))
 		ret = true;
-		return ret;
-	}
-
-	if (!strncasecmp(buf, "client.reconnect", 16) && parse_reconnect(pool, params)) {
-		ret = true;
-		return ret;
-	}
-
-	if (!strncasecmp(buf, "client.get_version", 18) && send_version(pool, val)) {
-		ret = true;
-		return ret;
-	}
-
-	if (!strncasecmp(buf, "client.show_message", 19) && show_message(pool, params)) {
-		ret = true;
-		return ret;
-	}
+out:
+//	if(params)
+//		json_decref(params);
+//	if(err_val)
+//		json_decref(err_val);
+//	if(method)
+//		json_decref(method);
+	json_decref(val);
 	return ret;
 }
 
 bool auth_stratum(struct pool *pool)
 {
-	json_t *val = NULL, *res_val, *err_val;
+	json_t *val = NULL, *res_val = NULL, *err_val = NULL;
 	char s[RBUFSIZE], *sret = NULL;
 	json_error_t err;
 	bool ret = false;
@@ -1777,14 +1771,18 @@ bool auth_stratum(struct pool *pool)
 			ss = strdup("(unknown reason)");
 		applog(LOG_WARNING, "pool %d JSON stratum auth failed: %s", pool->pool_no, ss);
 		free(ss);
-
-		return ret;
+	} else {
+		ret = true;
+		applog(LOG_INFO, "Stratum authorisation success for pool %d", pool->pool_no);
+		pool->probed = true;
+		successful_connect = true;
 	}
-
-	ret = true;
-	applog(LOG_INFO, "Stratum authorisation success for pool %d", pool->pool_no);
-	pool->probed = true;
-	successful_connect = true;
+	/* Decrement the references of the json values to make libjansson free the memory. */
+//	if(err_val)
+//		json_decref(err_val);
+//	if(res_val)
+//		json_decref(res_val);
+	json_decref(val);
 	return ret;
 }
 
@@ -2205,6 +2203,7 @@ resend:
 
 		applog(LOG_INFO, "JSON-RPC decode failed: %s", ss);
 
+		json_decref(err_val);
 		free(ss);
 
 		goto out;
@@ -2224,6 +2223,7 @@ resend:
 		applog(LOG_INFO, "Failed to get n2size in initiate_stratum");
 		free(sessionid);
 		free(nonce1);
+		json_decref(res_val);
 		goto out;
 	}
 
@@ -2244,6 +2244,7 @@ resend:
 
 	ret = true;
 out:
+	json_decref(val);
 	if (ret) {
 		if (!pool->stratum_url)
 			pool->stratum_url = pool->sockaddr_url;

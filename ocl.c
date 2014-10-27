@@ -236,31 +236,31 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	status = clGetPlatformIDs(0, NULL, &numPlatforms);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Getting Platforms. (clGetPlatformsIDs)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	platforms = (cl_platform_id *)alloca(numPlatforms*sizeof(cl_platform_id));
 	status = clGetPlatformIDs(numPlatforms, platforms, NULL);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Getting Platform Ids. (clGetPlatformsIDs)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	if (opt_platform_id >= (int)numPlatforms) {
 		applog(LOG_ERR, "Specified platform that does not exist");
-		return NULL;
+		goto exit_fail;
 	}
 
 	status = clGetPlatformInfo(platforms[opt_platform_id], CL_PLATFORM_VENDOR, sizeof(pbuff), pbuff, NULL);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Getting Platform Info. (clGetPlatformInfo)", status);
-		return NULL;
+		goto exit_fail;
 	}
 	platform = platforms[opt_platform_id];
 
 	if (platform == NULL) {
 		perror("NULL platform found!\n");
-		return NULL;
+		goto exit_fail;
 	}
 
 	applog(LOG_INFO, "CL Platform vendor: %s", pbuff);
@@ -276,7 +276,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	status = clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, 0, NULL, &numDevices);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Getting Device IDs (num)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	if (numDevices > 0 ) {
@@ -287,7 +287,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		status = clGetDeviceIDs(platform, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, numDevices, devices, NULL);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: Getting Device IDs (list)", status);
-			return NULL;
+			goto exit_fail;
 		}
 
 		applog(LOG_INFO, "List of devices:");
@@ -297,7 +297,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 			status = clGetDeviceInfo(devices[i], CL_DEVICE_NAME, sizeof(pbuff), pbuff, NULL);
 			if (status != CL_SUCCESS) {
 				applog(LOG_ERR, "Error %d: Getting Device Info", status);
-				return NULL;
+				goto exit_fail;
 			}
 
 			applog(LOG_INFO, "\t%i\t%s", i, pbuff);
@@ -307,24 +307,24 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 			status = clGetDeviceInfo(devices[gpu], CL_DEVICE_NAME, sizeof(pbuff), pbuff, NULL);
 			if (status != CL_SUCCESS) {
 				applog(LOG_ERR, "Error %d: Getting Device Info", status);
-				return NULL;
+				goto exit_fail;
 			}
 
 			applog(LOG_INFO, "Selected %i: %s", gpu, pbuff);
 			strncpy(name, pbuff, nameSize);
 		} else {
 			applog(LOG_ERR, "Invalid GPU %i", gpu);
-			return NULL;
+			goto exit_fail;
 		}
 
-	} else return NULL;
+	} else goto exit_fail;
 
 	cl_context_properties cps[3] = { CL_CONTEXT_PLATFORM, (cl_context_properties)platform, 0 };
 
 	clState->context = clCreateContextFromType(cps, opt_all_cldevices? CL_DEVICE_TYPE_ALL: CL_DEVICE_TYPE_GPU, NULL, NULL, &status);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Creating Context. (clCreateContextFromType)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	/////////////////////////////////////////////////////////////////
@@ -336,20 +336,20 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		clState->commandQueue = clCreateCommandQueue(clState->context, devices[gpu], 0 , &status);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Creating Command Queue. (clCreateCommandQueue)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	/* Check for BFI INT support. Hopefully people don't mix devices with
 	 * and without it! */
-	char * extensions = malloc(2048);
+	char extensions[2048];
 	const char * camo = "cl_amd_media_ops";
 	char *find;
 	bool hasPrintf= false;
 
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_EXTENSIONS, 2048, (void *)extensions, NULL);
 	if (status != CL_SUCCESS) {
-		applog(LOG_ERR, "Error %d: Failed to clGetDeviceInfo when trying to get CL_DEVICE_EXTENSIONS", status);
-		return NULL;
+		applog(LOG_ERR, "Error %d: Failed to clGetDeviceInfo when trying to get CL_DEVICE_EXTENSIONS", status);		
+		goto exit_fail;
 	}
 	find = strstr(extensions, camo);
 	if (find)
@@ -386,7 +386,8 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_VERSION, 1024, (void *)devoclver, NULL);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Failed to clGetDeviceInfo when trying to get CL_DEVICE_VERSION", status);
-		return NULL;
+		free(devoclver);
+		goto exit_fail;
 	}
 	find = strstr(devoclver, ocl10);
 	if (!find) {
@@ -408,21 +409,21 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT, sizeof(cl_uint), (void *)&preferred_vwidth, NULL);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Failed to clGetDeviceInfo when trying to get CL_DEVICE_PREFERRED_VECTOR_WIDTH_INT", status);
-		return NULL;
+		goto exit_fail;
 	}
 	applog(LOG_DEBUG, "Preferred vector width reported %d", preferred_vwidth);
 
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), (void *)&clState->max_work_size, NULL);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Failed to clGetDeviceInfo when trying to get CL_DEVICE_MAX_WORK_GROUP_SIZE", status);
-		return NULL;
+		goto exit_fail;
 	}
 	applog(LOG_DEBUG, "Max work group size reported %d", (int)(clState->max_work_size));
 
 	status = clGetDeviceInfo(devices[gpu], CL_DEVICE_MAX_MEM_ALLOC_SIZE , sizeof(cl_ulong), (void *)&cgpu->max_alloc, NULL);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Failed to clGetDeviceInfo when trying to get CL_DEVICE_MAX_MEM_ALLOC_SIZE", status);
-		return NULL;
+		goto exit_fail;
 	}
 	applog(LOG_DEBUG, "Max mem alloc size is %lu", (long unsigned int)(cgpu->max_alloc));
 
@@ -577,9 +578,9 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 #ifdef USE_NEOSCRYPT
 	if(opt_neoscrypt){
 		cgpu->max_intensity = cgpu->dynamic? MAX_INTENSITY: cgpu->intensity;
-		size_t glob_thread_count = 1U<< cgpu->max_intensity;
+		size_t glob_thread_count = 1UL<< cgpu->max_intensity;
 		cgpu->thread_concurrency = (glob_thread_count< cgpu->work_size ? cgpu->work_size: glob_thread_count);
-		if(cgpu->max_alloc< cgpu->thread_concurrency* NEOSCRYPT_SCRATCHBUF_SIZE) {
+		if((uint64_t)cgpu->max_alloc< (uint64_t)cgpu->thread_concurrency* NEOSCRYPT_SCRATCHBUF_SIZE) {
 			/* Selected intensity will not run on this GPU. Not enough memory.
 			 * Adapt the memory setting. */
 			glob_thread_count= cgpu->max_alloc/ NEOSCRYPT_SCRATCHBUF_SIZE;
@@ -602,24 +603,21 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	size_t *binary_sizes;
 	char **binaries;
 	int pl;
-	char *source = file_contents(filename, &pl);
-	size_t sourceSize[] = {(size_t)pl};
+	char *source= 0;
+	size_t sourceSize[1];
 	cl_uint slot, cpnd;
 
 	slot = cpnd = 0;
 
-	if (!source)
-		return NULL;
-
 	binary_sizes = calloc(sizeof(size_t) * MAX_GPUDEVICES * 4, 1);
 	if (unlikely(!binary_sizes)) {
 		applog(LOG_ERR, "Unable to calloc binary_sizes");
-		return NULL;
+		goto exit_fail;
 	}
 	binaries = calloc(sizeof(char *) * MAX_GPUDEVICES * 4, 1);
 	if (unlikely(!binaries)) {
 		applog(LOG_ERR, "Unable to calloc binaries");
-		return NULL;
+		goto exit_fail;
 	}
 
 	strcat(binaryfilename, name);
@@ -678,7 +676,7 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 		if (unlikely(!binaries[slot])) {
 			applog(LOG_ERR, "Unable to calloc binaries");
 			fclose(binaryfile);
-			return NULL;
+			goto exit_fail;
 		}
 
 		if (fread(binaries[slot], 1, binary_sizes[slot], binaryfile) != binary_sizes[slot]) {
@@ -707,10 +705,15 @@ _clState *initCl(unsigned int gpu, char *name, size_t nameSize)
 	/////////////////////////////////////////////////////////////////
 
 build:
+	source = file_contents(filename, &pl);
+	sourceSize[0] = (size_t)pl;
+	if(!source)
+		goto exit_fail;
+
 	clState->program = clCreateProgramWithSource(clState->context, 1, (const char **)&source, sourceSize, &status);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Loading Binary into cl_program (clCreateProgramWithSource)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	/* create a cl program executable for all the devices specified */
@@ -781,7 +784,7 @@ build:
 		char *log = malloc(logSize);
 		status = clGetProgramBuildInfo(clState->program, devices[gpu], CL_PROGRAM_BUILD_LOG, logSize, log, NULL);
 		applog(LOG_ERR, "%s", log);
-		return NULL;
+		goto exit_fail;
 	}
 
 	prog_built = true;
@@ -789,19 +792,20 @@ build:
 #ifdef __APPLE__
 	/* OSX OpenCL breaks reading off binaries with >1 GPU so always build
 	 * from source. */
+	free(source);
 	goto built;
 #endif
 
 	status = clGetProgramInfo(clState->program, CL_PROGRAM_NUM_DEVICES, sizeof(cl_uint), &cpnd, NULL);
 	if (unlikely(status != CL_SUCCESS)) {
 		applog(LOG_ERR, "Error %d: Getting program info CL_PROGRAM_NUM_DEVICES. (clGetProgramInfo)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	status = clGetProgramInfo(clState->program, CL_PROGRAM_BINARY_SIZES, sizeof(size_t)*cpnd, binary_sizes, NULL);
 	if (unlikely(status != CL_SUCCESS)) {
 		applog(LOG_ERR, "Error %d: Getting program info CL_PROGRAM_BINARY_SIZES. (clGetProgramInfo)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	/* The actual compiled binary ends up in a RANDOM slot! Grr, so we have
@@ -815,13 +819,13 @@ build:
 	applog(LOG_DEBUG, "Binary size for gpu %d found in binary slot %d: %d", gpu, slot, (int)(binary_sizes[slot]));
 	if (!binary_sizes[slot]) {
 		applog(LOG_ERR, "OpenCL compiler generated a zero sized binary, FAIL!");
-		return NULL;
+		goto exit_fail;
 	}
 	binaries[slot] = calloc(sizeof(char) * binary_sizes[slot], 1);
 	status = clGetProgramInfo(clState->program, CL_PROGRAM_BINARIES, sizeof(char *) * cpnd, binaries, NULL );
 	if (unlikely(status != CL_SUCCESS)) {
 		applog(LOG_ERR, "Error %d: Getting program info. CL_PROGRAM_BINARIES (clGetProgramInfo)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 	/* Patch the kernel if the hardware supports BFI_INT but it needs to
@@ -861,13 +865,13 @@ build:
 		status = clReleaseProgram(clState->program);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: Releasing program. (clReleaseProgram)", status);
-			return NULL;
+			goto exit_fail;
 		}
 
 		clState->program = clCreateProgramWithBinary(clState->context, 1, &devices[gpu], &binary_sizes[slot], (const unsigned char **)&binaries[slot], &status, NULL);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: Loading Binary into cl_program (clCreateProgramWithBinary)", status);
-			return NULL;
+			goto exit_fail;
 		}
 
 		/* Program needs to be rebuilt */
@@ -875,6 +879,7 @@ build:
 	}
 
 	free(source);
+	source= 0;
 
 	/* Save the binary to be loaded next time */
 	binaryfile = fopen(binaryfilename, "wb");
@@ -884,7 +889,7 @@ build:
 	} else {
 		if (unlikely(fwrite(binaries[slot], 1, binary_sizes[slot], binaryfile) != binary_sizes[slot])) {
 			applog(LOG_ERR, "Unable to fwrite to binaryfile");
-			return NULL;
+			goto exit_fail;
 		}
 		fclose(binaryfile);
 	}
@@ -908,7 +913,7 @@ built:
 			char *log = malloc(logSize);
 			status = clGetProgramBuildInfo(clState->program, devices[gpu], CL_PROGRAM_BUILD_LOG, logSize, log, NULL);
 			applog(LOG_ERR, "%s", log);
-			return NULL;
+			goto exit_fail;
 		}
 	}
 
@@ -916,7 +921,7 @@ built:
 	clState->kernel = clCreateKernel(clState->program, "search", &status);
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: Creating Kernel from program. (clCreateKernel)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
 #ifdef USE_SCRYPT
@@ -941,13 +946,13 @@ built:
 		clState->padbuffer8 = clCreateBuffer(clState->context, CL_MEM_READ_WRITE, bufsize, NULL, &status);
 		if (status != CL_SUCCESS && !clState->padbuffer8) {
 			applog(LOG_ERR, "Error %d: clCreateBuffer (padbuffer8), decrease TC or increase LG", status);
-			return NULL;
+			goto exit_fail;
 		}
 
 		clState->CLbuffer0 = clCreateBuffer(clState->context, CL_MEM_READ_ONLY, 128, NULL, &status);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: clCreateBuffer (CLbuffer0)", status);
-			return NULL;
+			goto exit_fail;
 		}
 		clState->outputBuffer = clCreateBuffer(clState->context, CL_MEM_WRITE_ONLY, SCRYPT_BUFFERSIZE, NULL, &status);
 	} else
@@ -975,14 +980,14 @@ built:
 		clState->padbuffer8 = clCreateBuffer(clState->context, CL_MEM_READ_WRITE, bufsize, NULL, &status);
 		if (status != CL_SUCCESS && !clState->padbuffer8) {
 			applog(LOG_ERR, "Error %d: clCreateBuffer (padbuffer8)", status);
-			return NULL;
+			goto exit_fail;
 		}
 		/* This is the input buffer. For neoscrypt this is guaranteed to be
 		 * 80 bytes only. */
 		clState->CLbuffer0 = clCreateBuffer(clState->context, CL_MEM_READ_ONLY, 80, NULL, &status);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: clCreateBuffer (CLbuffer0)", status);
-			return NULL;
+			goto exit_fail;
 		}
 		applog(LOG_DEBUG, "Creating neoscrypt output buffer sized %lu", SCRYPT_BUFFERSIZE);
 		clState->outputBuffer = clCreateBuffer(clState->context, CL_MEM_WRITE_ONLY, SCRYPT_BUFFERSIZE, NULL, &status);
@@ -994,7 +999,7 @@ built:
 		clState->keccak_CLbuffer = clCreateBuffer(clState->context, CL_MEM_READ_ONLY, KECCAK_BUFFER_SIZE, NULL, &status);
 		if (status != CL_SUCCESS) {
 			applog(LOG_ERR, "Error %d: clCreateBuffer (keccak_CLbuffer)", status);
-		return NULL;
+		goto exit_fail;
 		}
 
 		clState->outputBuffer = clCreateBuffer(clState->context, CL_MEM_WRITE_ONLY, BUFFERSIZE, NULL, &status);
@@ -1005,10 +1010,17 @@ built:
 	/* This check is executed for all clCreateBuffer() calls in the above conds. */
 	if (status != CL_SUCCESS) {
 		applog(LOG_ERR, "Error %d: clCreateBuffer (outputBuffer)", status);
-		return NULL;
+		goto exit_fail;
 	}
 
+	free(devices);
 	return clState;
+
+exit_fail:
+	if(source)
+		free(source);
+	free(devices);
+	return NULL;
 }
 #endif /* HAVE_OPENCL */
 
